@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Administration</title>
+<link rel="preload" href="/fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/admin/admin.css?v=20261020">
+</head><body>
+<div class="app" id="app" hidden>
+  <div class="topbar"><button id="menuBtn" aria-label="Menu">☰</button><strong id="topTitle">Administration</strong></div>
+  <aside class="side" id="side">
+    <div class="logo" id="logo">Admin<small>Espace gestion</small></div>
+    <nav id="nav"></nav>
+    <div class="me"><b id="meName"></b><span class="small muted" id="meRole"></span><div style="margin-top:.5rem"><button id="pwBtn">Mot de passe</button><button id="outBtn">Déconnexion</button></div>
+      <div style="margin-top:.6rem"><a class="small" href="/" target="_blank" style="color:var(--mint)">↗ Voir la boutique</a></div></div>
+  </aside>
+  <main class="main" id="view"><div class="loading"><span class="spin"></span></div></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/admin/admin.js?v=20261020"></script>
+<script src="/admin/admin-views.js?v=20261020"></script>
+</body></html>

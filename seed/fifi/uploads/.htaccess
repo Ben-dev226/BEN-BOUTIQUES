@@ -1,0 +1,6 @@
+# Uniquement des images : jamais d'exécution de code
+Options -Indexes -ExecCGI
+RemoveHandler .php .phtml .php3 .php5 .phps
+<FilesMatch "\.(php|phtml|phar|cgi|pl)$">
+  Require all denied
+</FilesMatch>

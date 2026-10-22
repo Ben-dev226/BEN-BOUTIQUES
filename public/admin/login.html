@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Connexion – Administration</title>
+<style>
+@font-face{font-family:"Bricolage";src:url(/fonts/bricolage.woff2) format("woff2");font-weight:200 800;font-display:swap}
+@font-face{font-family:"Instrument";src:url(/fonts/instrument.woff2) format("woff2");font-weight:400 700;font-display:swap}
+:root{--forest:#0D3B2C;--forest2:#164E3B;--sun:#FFC93C;--mint:#D8E6DA;--paper:#F1F4EC;--ink:#10201A}
+*{box-sizing:border-box;margin:0}
+body{font-family:"Instrument",system-ui,sans-serif;background:var(--forest);min-height:100vh;display:grid;place-items:center;padding:1rem;position:relative;overflow:hidden;color:var(--ink)}
+body::before{content:'';position:absolute;inset:0;background:radial-gradient(circle,var(--sun) 2.5px,transparent 2.5px) 0 0/30px 30px;opacity:.16}
+body::after{content:'';position:absolute;width:520px;height:520px;border-radius:50%;background:var(--forest2);right:-160px;bottom:-200px}
+.card{position:relative;z-index:1;background:var(--paper);border-radius:36px;padding:2.2rem 2rem;width:100%;max-width:400px;box-shadow:0 30px 70px rgba(0,0,0,.35)}
+h1{font:800 2rem/1.05 "Bricolage",sans-serif;letter-spacing:-.025em;color:var(--forest)}h1 span{background:var(--sun);padding:0 .25em;border-radius:.3em;margin-left:.05em}
+.sub{font-size:.95rem;color:#52665B;margin:.5rem 0 1.6rem}
+label{display:block;font-size:.85rem;font-weight:700;margin-bottom:1rem}
+input{display:block;width:100%;margin-top:.35rem;padding:.8rem 1rem;border:1.5px solid #C3CFC5;border-radius:14px;font:inherit;outline:none;background:#fff}
+input:focus{border-color:var(--forest);box-shadow:0 0 0 3px rgba(255,201,60,.6)}
+button{width:100%;padding:.9rem;border:0;border-radius:99px;background:var(--forest);color:#fff;font:700 1rem "Instrument",sans-serif;cursor:pointer;box-shadow:0 4px 0 var(--sun)}button:hover{background:var(--forest2)}button:disabled{opacity:.6}
+.err{background:#FBE0DD;border:1px solid #E8A8A2;color:#8C1D15;padding:.65rem .9rem;border-radius:12px;font-size:.88rem;margin-bottom:1rem}
+a{display:block;text-align:center;margin-top:1.3rem;font-size:.85rem;color:#52665B;text-decoration:none}a:hover{color:var(--forest);text-decoration:underline}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+</style></head><body>
+<form class="card" id="f" autocomplete="on">
+  <h1 id="brand">Administration</h1><p class="sub">Connectez-vous pour gérer vos commandes et vos produits.</p>
+  <div class="err" id="err" hidden role="alert"></div>
+  <label>Identifiant<input name="username" autocomplete="username" required autofocus></label>
+  <label>Mot de passe<input name="password" type="password" autocomplete="current-password" required></label>
+  <button id="btn">Se connecter</button>
+  <a href="/">← Retour à la boutique</a>
+</form>
+<script>
+const api = 'index.php';
+fetch('/api/index.php?r=auth/me', {credentials:'same-origin'}).then(r=>r.json()).then(d=>{ if(d.user) location.replace('/admin/'); });
+fetch('/api/index.php?r=settings').then(r=>r.json()).then(s=>{ const n=(s.shop_name||'').split(' '); const l=n.pop(); document.getElementById('brand').innerHTML=(n.join(' ')?n.join(' ').replace(/[<>&]/g,'')+' ':'')+'<span>'+l.replace(/[<>&]/g,'')+'</span>'; document.title='Connexion – '+s.shop_name; }).catch(()=>{});
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault(); const b=document.getElementById('btn'), er=document.getElementById('err'); b.disabled=true; er.hidden=true;
+  try {
+    const r = await fetch('/api/index.php?r=auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});
+    const d = await r.json(); if(!r.ok) throw new Error(d.error||'Erreur'); location.replace('/admin/');
+  } catch(x){ er.textContent=x.message; er.hidden=false; b.disabled=false; }
+});
+</script></body></html>
