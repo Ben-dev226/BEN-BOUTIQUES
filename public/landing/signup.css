@@ -1,0 +1,7 @@
+.su{max-width:520px;margin:0 auto;padding:2rem 1.25rem 4rem}.su .logo{display:inline-flex;margin-bottom:2rem}
+.su h1{font-size:clamp(2rem,6vw,2.8rem);margin-bottom:.8rem}.su h2{font-size:1.8rem;margin-bottom:.6rem}.su .lead{color:var(--mut);margin-bottom:1.6rem}
+.su form{display:grid;gap:1.1rem}.su label{display:grid;gap:.35rem;font-weight:600;font-size:.95rem}.su label em{font-weight:400;color:var(--mut);font-style:normal}
+.su input{font:inherit;padding:.85rem 1rem;border:2px solid var(--line);border-radius:14px;background:#fff;color:var(--ink);width:100%}.su input:focus-visible{outline:3px solid var(--sun);border-color:var(--forest)}
+.su small{font-weight:400;color:var(--mut);font-size:.82rem}.su small.good{color:#1E7A4F}.su small.bad{color:#B3261E}
+.su .slug{display:flex;align-items:center;border:2px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}.su .slug input{border:0;border-radius:0;flex:1;min-width:0}.su .slug input:focus-visible{outline:none}.su .slug:focus-within{outline:3px solid var(--sun);border-color:var(--forest)}.su .slug i{font-style:normal;color:var(--mut);padding-right:1rem;font-weight:400;white-space:nowrap}
+.su .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}.su #err{color:#B3261E;font-weight:600;min-height:1.2em}.su .btn{justify-content:center;cursor:pointer}.su .btn[disabled]{opacity:.6}

@@ -40,7 +40,7 @@ async function guard(rep: MaintenanceReport): Promise<boolean> {
     const age = await lastRemoteBackupAgeHours();
     if (age === null || age > 2) { const b = await runBackup('before_cleanup'); rep.backup = b.file_name; if (!(b.ok && b.remote_ok)) rep.blocked = `Compactage bloqué : la sauvegarde préalable a échoué (${b.error}).`; }
   }
-  if (rep.blocked) { await logError({ type: 'cleanup_blocked', message: rep.blocked }); await sendAlert(`⚠️ ${rep.blocked}`); return false; }
+  if (rep.blocked) { await logError({ type: 'cleanup_blocked', message: rep.blocked }); await sendAlert(`${rep.blocked}`); return false; }
   return true;
 }
 
@@ -78,6 +78,7 @@ export async function runMaintenance(opts: { dryRun?: boolean; force?: boolean; 
   await del('Paiements en attente périmés (+30 j)', 'billing_checkouts', `created_at < ${days(30)}`);
   await del(`Événements plateforme de plus de ${eventDays} j`, 'platform_events', `created_at < ${days(eventDays)}`);
   await del('Compteurs d\'audience de plus de 2 ans', 'stats_daily', `day < (now() AT TIME ZONE 'utc')::date - 730`);
+  await del('Mesures de performance de plus de 60 jours', 'perf_hourly', `hour < ${days(60)}`);
   await del('Anciennes sauvegardes (journal, +180 j)', 'backups', `created_at < ${days(180)}`);
 
   // 2. à partir de 70 %
@@ -131,11 +132,11 @@ export async function runMaintenance(opts: { dryRun?: boolean; force?: boolean; 
   rep.after = { mb: mb(u1.bytes), pct: u1.pct }; rep.freed_mb = Math.round((u0.bytes - u1.bytes) / 104857.6) / 10;
   if (!dry && actions.length) {
     await logInfo({ type: 'maintenance', message: `Nettoyage base : ${actions.map(a => `${a.what} ×${a.rows}`).join(' ; ')} — ${rep.before.pct}% → ${rep.after.pct}%`.slice(0, 290), detail: rep });
-    if (actions.some(a => /compact|recours/i.test(a.what))) await sendAlert(`🧹 Base allégée : ${rep.before.mb} Mo → ${rep.after.mb} Mo (${rep.after.pct} % du quota). Détail des vieilles commandes archivé (chiffres conservés).`);
+    if (actions.some(a => /compact|recours/i.test(a.what))) await sendAlert(`Base allégée : ${rep.before.mb} Mo → ${rep.after.mb} Mo (${rep.after.pct} % du quota). Détail des vieilles commandes archivé (chiffres conservés).`);
   }
   if (!dry && u1.level !== 'ok') {
     await logWarn({ type: 'db_quota', message: `Base à ${u1.pct} % du quota (${mb(u1.bytes)} / ${mb(u1.quota)} Mo)` });
-    await sendAlert(`${u1.level === 'critical' ? '🔴' : '🟠'} Base de données à ${u1.pct} % du quota (${mb(u1.bytes)} / ${mb(u1.quota)} Mo).${u1.level === 'critical' ? ' Passez à une offre supérieure ou réduisez les données.' : ''}`);
+    await sendAlert(`${u1.level === 'critical' ? '' : ''} Base de données à ${u1.pct} % du quota (${mb(u1.bytes)} / ${mb(u1.quota)} Mo).${u1.level === 'critical' ? ' Passez à une offre supérieure ou réduisez les données.' : ''}`);
   }
   return rep;
 }

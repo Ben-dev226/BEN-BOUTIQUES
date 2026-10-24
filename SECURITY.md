@@ -10,7 +10,7 @@ Périmètre : tout le code (auth, isolation entre boutiques, API, uploads, paiem
 | 3 | Élevée | Suivi de commande : sans téléphone, n'importe quel numéro de commande renvoyait articles, total et statut. | Téléphone obligatoire, ou clé secrète (HMAC) intégrée au lien WhatsApp. |
 | 4 | Moyenne | Liens réseaux sociaux non filtrés (`javascript:` → XSS pour les visiteurs). | Seules les URL http(s) sont acceptées (à l'enregistrement et à l'affichage). |
 | 5 | Moyenne | Sessions non révocables : un changement de mot de passe laissait les anciennes sessions valides 8 h. | Empreinte du mot de passe dans le jeton : toute autre session est invalidée. |
-| 6 | Moyenne | Super-admin sans double authentification. | TOTP (Google Authenticator, Authy…) avec anti-rejeu, activable dans le panneau (🔐 2FA). Récupération : `npm run super:create -- … --reset-2fa`. |
+| 6 | Moyenne | Super-admin sans double authentification. | TOTP (Google Authenticator, Authy…) avec anti-rejeu, activable dans le panneau (2FA). Récupération : `npm run super:create -- … --reset-2fa`. |
 | 7 | Moyenne | Panneau super-admin accessible sur `*.vercel.app`. | Servi uniquement sur `super.<domaine>` (sauf `SUPER_ALLOW_VERCEL_APP=1`). |
 | 8 | Moyenne | Verrouillage de connexion par compte : un tiers pouvait bloquer l'administrateur. | Verrou par (compte + IP) + plafond global plus large : l'attaquant est bloqué, pas le propriétaire. |
 | 9 | Faible | Aucune CSP ni protection anti-clickjacking sur la vitrine. | CSP (pas d'objets, `base-uri`, `form-action`, `frame-ancestors`), `X-Frame-Options`. |

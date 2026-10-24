@@ -9,6 +9,11 @@ export type Result = { rows: any[]; rowCount: number };
 export interface Db { query(sql: string, params?: unknown[]): Promise<Result>; script(sql: string): Promise<void>; }
 export interface Driver extends Db { tx<T>(fn: (t: Db) => Promise<T>): Promise<T>; close?(): Promise<void>; }
 
+/** Crochet de mesure (installé par lib/perf.ts) : durée de chaque requête SQL. */
+const timed = async <T>(sql: string, run: () => Promise<T>): Promise<T> => {
+  const t0 = Date.now(); const obs = (globalThis as any).__dbObs as ((ms: number, sql: string, err: boolean) => void) | undefined;
+  try { const r = await run(); obs?.(Date.now() - t0, sql, false); return r; } catch (e) { obs?.(Date.now() - t0, sql, true); throw e; }
+};
 const PARSERS: Record<number, (v: string) => unknown> = {
   20: v => Number(v),                 // int8
   1700: v => Number(v),               // numeric
@@ -25,7 +30,7 @@ async function makeDriver(): Promise<Driver> {
     const local = /localhost|127\.0\.0\.1/.test(url);
     const pool = new pg.Pool({ connectionString: url, max: Number(process.env.PG_POOL_MAX || 5), ssl: local ? undefined : { rejectUnauthorized: false } });
     const wrap = (c: { query: (s: string, p?: unknown[]) => Promise<any> }): Db => ({
-      async query(sql, params) { const r = await c.query(sql, params as any[]); return { rows: r.rows, rowCount: r.rowCount ?? 0 }; },
+      async query(sql, params) { const r = await timed(sql, () => c.query(sql, params as any[])); return { rows: r.rows, rowCount: r.rowCount ?? 0 }; },
       async script(sql) { await c.query(sql); },
     });
     return {
@@ -38,13 +43,15 @@ async function makeDriver(): Promise<Driver> {
       },
     };
   }
+  if (process.env.VERCEL || (process.env.NODE_ENV === 'production' && process.env.ALLOW_LOCAL_DB !== '1'))
+    throw new Error('DATABASE_URL absent : ajoutez la chaîne de connexion Supabase dans les variables d\'environnement Vercel (Production), puis redéployez.');
   const { PGlite } = await import('@electric-sql/pglite');
   const dir = process.env.PGLITE_DIR || '.data/pg';
   (await import('node:fs')).mkdirSync(dir.replace(/\/[^/]+$/, ''), { recursive: true });
   const db = new PGlite(dir, { parsers: PARSERS as any });
   await db.waitReady;
   const wrap = (c: { query: (s: string, p?: unknown[]) => Promise<any>; exec: (s: string) => Promise<any> }): Db => ({
-    async query(sql, params) { const r = await c.query(sql, params as any[]); return { rows: r.rows, rowCount: Math.max(r.affectedRows ?? 0, r.rows.length) }; },
+    async query(sql, params) { const r = await timed(sql, () => c.query(sql, params as any[])); return { rows: r.rows, rowCount: Math.max(r.affectedRows ?? 0, r.rows.length) }; },
     async script(sql) { await c.exec(sql); },
   });
   let chain: Promise<unknown> = Promise.resolve();      // PGlite = 1 connexion : on sérialise les transactions

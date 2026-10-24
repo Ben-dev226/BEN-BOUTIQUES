@@ -12,7 +12,8 @@ export async function landingPage(host: string): Promise<Response> {
   let demo = process.env.DEMO_URL || '';
   if (!demo) { try { const t = await one<{ slug: string }>("SELECT slug FROM tenants WHERE status = 'active' ORDER BY id LIMIT 1"); if (t && root) demo = `https://${t.slug}.${root}`; } catch { /* idem */ } }
   const wa = (process.env.CONTACT_WHATSAPP || '').replace(/\D/g, ''), mail = process.env.CONTACT_EMAIL || '';
-  const contact = wa ? `https://wa.me/${wa}?text=${encodeURIComponent('Bonjour, je veux créer ma boutique en ligne.')}` : mail ? `mailto:${mail}?subject=${encodeURIComponent('Créer ma boutique')}` : '#places';
+  const signup = (process.env.SIGNUP_MODE || 'review').toLowerCase() !== 'off';
+  const contact = signup ? '/inscription' : wa ? `https://wa.me/${wa}?text=${encodeURIComponent('Bonjour, je veux créer ma boutique en ligne.')}` : mail ? `mailto:${mail}?subject=${encodeURIComponent('Créer ma boutique')}` : '#places';
   const origin = `https://${host}`;
   const body = (
     <>

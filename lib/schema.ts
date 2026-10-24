@@ -294,4 +294,68 @@ CREATE TABLE stats_daily (
   PRIMARY KEY (tenant_id, day, metric, ref)
 );
 `,
+// ───────── 9 : rapports enregistrés par boutique ─────────
+`
+CREATE TABLE saved_reports (
+  id SERIAL PRIMARY KEY,
+  tenant_id INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  config TEXT NOT NULL,
+  created_by TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT ${U}
+);
+CREATE INDEX saved_reports_tenant ON saved_reports (tenant_id);
+`,
+// ───────── 10 : mesures de performance et de disponibilité (agrégées par heure) ─────────
+`
+CREATE TABLE perf_hourly (
+  hour TIMESTAMP NOT NULL,
+  key TEXT NOT NULL,                 -- api:<route>, db, health, beacon
+  n INT NOT NULL DEFAULT 0,
+  errors INT NOT NULL DEFAULT 0,
+  sum_ms BIGINT NOT NULL DEFAULT 0,
+  max_ms INT NOT NULL DEFAULT 0,
+  b0 INT NOT NULL DEFAULT 0, b1 INT NOT NULL DEFAULT 0, b2 INT NOT NULL DEFAULT 0, b3 INT NOT NULL DEFAULT 0, b4 INT NOT NULL DEFAULT 0, b5 INT NOT NULL DEFAULT 0, b6 INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (hour, key)
+);
+`,
+// ───────── 11 : demandes d'inscription de nouvelles boutiques ─────────
+`
+CREATE TABLE signup_requests (
+  id SERIAL PRIMARY KEY,
+  slug TEXT NOT NULL,
+  name TEXT NOT NULL,
+  whatsapp TEXT NOT NULL,
+  email TEXT NOT NULL DEFAULT '',
+  password_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  tenant_id INT,
+  ip TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT ${U},
+  decided_at TIMESTAMP
+);
+CREATE INDEX signup_status ON signup_requests (status, created_at);
+`,
+// ───────── 12 : modération des boutiques (blocage, bannissement, suppression programmée) ─────────
+`
+ALTER TABLE tenants ADD COLUMN blocked_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE tenants ADD COLUMN blocked_at TIMESTAMP;
+ALTER TABLE tenants ADD COLUMN banned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE tenants ADD COLUMN ban_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE tenants ADD COLUMN banned_at TIMESTAMP;
+ALTER TABLE tenants ADD COLUMN delete_after TIMESTAMP;
+CREATE TABLE banlist (
+  id SERIAL PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('slug','whatsapp','email')),
+  value TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  tenant_slug TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT ${U},
+  UNIQUE (kind, value)
+);
+`,
+// ───────── 13 : compteur « boutiques créées à vie » fiable (une séquence peut sauter jusqu'à 32 valeurs après un incident) ─────────
+`
+INSERT INTO platform_state (k, v) SELECT 'shops_created', GREATEST((SELECT COUNT(*) FROM tenants), (SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM tenants_id_seq))::text ON CONFLICT (k) DO NOTHING;
+`,
 ];

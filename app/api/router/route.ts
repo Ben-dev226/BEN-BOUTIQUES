@@ -5,6 +5,7 @@ import * as P from '@/lib/api/public';
 import * as A from '@/lib/api/admin';
 import * as O from '@/lib/api/orders';
 import { logError, logSecurity, logWarn } from '@/lib/log';
+import { guardIp, noteBad, observe, flush } from '@/lib/perf';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,9 @@ const T: Record<string, Partial<Record<string, [Level, H]>>> = {
   'auth/logout': { POST: [null, P.apiLogout] },
   'auth/me': { GET: [null, P.apiMe] },
   'auth/password': { POST: ['pending', P.apiChangePassword] },
+  'admin/report': { GET: ['user', A.adminReport] },
+  'admin/report/export': { GET: ['user', A.adminReportExport] },
+  'admin/reports': { GET: ['user', A.adminReportsList], POST: ['user', A.adminReportSave], DELETE: ['user', A.adminReportDelete] },
   'admin/insights': { GET: ['user', A.adminInsights] },
   'admin/analytics': { GET: ['user', A.adminAnalytics] },
   'admin/stats': { GET: ['user', A.adminStats] },
@@ -49,7 +53,7 @@ const T: Record<string, Partial<Record<string, [Level, H]>>> = {
   'admin/backup': { GET: ['admin', A.adminBackup] },
 };
 
-async function handle(req: NextRequest): Promise<Response> {
+async function inner(req: NextRequest): Promise<Response> {
   const json = (d: unknown, status: number) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' } });
   try {
     const tenant = await tenantForHost(hostFromHeaders(req.headers));
@@ -74,5 +78,15 @@ async function handle(req: NextRequest): Promise<Response> {
     await logError({ type: 'api_error', message: `${req.method} ${route} : ${(e as Error)?.message}`, ip, detail: e });
     return json({ error: 'Erreur serveur' }, 500);
   }
+}
+async function handle(req: NextRequest): Promise<Response> {
+  const t0 = Date.now(), ip = clientIp(req.headers), r = (req.nextUrl.searchParams.get('r') || '').replace(/^\/+|\/+$/g, '');
+  const key = 'api:' + (T[r] ? r : 'inconnue');
+  if (guardIp(ip)) { observe(key, 0, false); return new Response(JSON.stringify({ error: 'Trop de requêtes, réessayez dans quelques minutes.' }), { status: 429, headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Retry-After': '600', 'Cache-Control': 'no-store' } }); }
+  const res = await inner(req);
+  observe(key, Date.now() - t0, res.status >= 500);
+  if ([401, 403, 404, 429].includes(res.status)) noteBad(ip, res.status, r.slice(0, 40));
+  await flush();
+  return res;
 }
 export { handle as GET, handle as POST, handle as PUT, handle as DELETE };

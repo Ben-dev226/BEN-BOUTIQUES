@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
               <button className="btn btn-red btn-lg" id="addBtn" disabled={!P.in_stock}>{P.in_stock ? 'Ajouter au panier' : 'Indisponible'}</button>
             </div>
             {P.in_stock && <button className="btn btn-wa btn-lg block" id="buyNow">Commander maintenant</button>}
-            <ul className="assure"><li>💬 Confirmation de la commande par WhatsApp</li><li>🚚 {s.delivery_note}</li><li>💵 Paiement à la livraison</li></ul>
+            <ul className="assure"><li>Confirmation de la commande par WhatsApp</li><li>{s.delivery_note}</li><li>Paiement à la livraison</li></ul>
             <div className="share"><span>Partager :</span>
               <a target="_blank" rel="noopener noreferrer" href={`https://wa.me/?text=${encodeURIComponent(P.name + ' – ' + shop.origin + P.url)}`}>WhatsApp</a>
               <a target="_blank" rel="noopener noreferrer" href={`https://www.facebook.com/sharer/sharer.php?u=${share}`}>Facebook</a>

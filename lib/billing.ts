@@ -73,7 +73,7 @@ export async function creditSale(p: any, deliveryId: string | null): Promise<{ t
     const today = new Date().toISOString().slice(0, 10);
     const base = tenant.paid_until && tenant.paid_until > today ? tenant.paid_until : today;
     const until = addMonthsFrom(base, plan.months);
-    await exec('UPDATE tenants SET paid_until = $1, status = \'active\'' + (plan.plan ? ', plan = $3' : '') + ' WHERE id = $2', plan.plan ? [until, tid, plan.plan] : [until, tid], t);
+    await exec('UPDATE tenants SET paid_until = $1, status = CASE WHEN banned OR blocked_at IS NOT NULL OR delete_after IS NOT NULL THEN status ELSE \'active\' END' + (plan.plan ? ', plan = $3' : '') + ' WHERE id = $2', plan.plan ? [until, tid, plan.plan] : [until, tid], t);
     await exec('INSERT INTO billing_payments (tenant_id, sale_id, delivery_id, product_id, months, amount, currency, paid_until_before, paid_until_after) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
       [tid, saleId, deliveryId, plan.id, plan.months, Number(p.sale?.amount?.value) || 0, String(p.sale?.amount?.currency ?? ''), tenant.paid_until, until], t);
     forgetTenants();

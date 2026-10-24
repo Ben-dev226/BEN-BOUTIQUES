@@ -135,4 +135,4 @@ input[type=text],input[type=search],input[type=number],input[type=password],inpu
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 input,select,textarea{font-weight:400}
 
-.insights{display:grid;gap:.6rem}.ins{display:flex;gap:.7rem;padding:.7rem .85rem;border-radius:14px;background:var(--mint);align-items:flex-start}.ins.l-warn{background:#FFF3DA}.ins.l-good{background:#E3F4E8}.ins .ico{font-size:1.15rem;line-height:1.3}.ins b{display:block}.ins p{margin:.15rem 0 .2rem;color:var(--muted,#44574f);font-size:.9rem;line-height:1.45}.ins a{font-weight:600}
+.insights{display:grid;gap:.6rem}.ins{display:flex;gap:.7rem;padding:.7rem .85rem;border-radius:14px;background:var(--mint);align-items:flex-start}.ins.l-warn{background:#FFF3DA}.ins.l-good{background:#E3F4E8}.ins .ico{font-size:.72rem;font-weight:700;min-width:4.6rem;padding-top:.2rem;text-transform:none;color:var(--muted,#44574f)}.ins b{display:block}.ins p{margin:.15rem 0 .2rem;color:var(--muted,#44574f);font-size:.9rem;line-height:1.45}.ins a{font-weight:600}

@@ -75,9 +75,9 @@ async function navigate() {
 
 // ── Coquille ──────────────────────────────────────────────
 const NAV = [
-  ['dashboard', '📊', 'Tableau de bord'], ['audience', '📈', 'Audience'], ['orders', '🧾', 'Commandes'], ['products', '👕', 'Produits'], ['categories', '🏷️', 'Catégories'],
-  ['customers', '👥', 'Clients'], ['promos', '🎟️', 'Codes promo'], ['sep', '', 'Administration'],
-  ['settings', '⚙️', 'Paramètres', 1], ['users', '🔐', 'Utilisateurs', 1], ['activity', '📜', 'Journal', 1],
+  ['dashboard', '', 'Tableau de bord'], ['audience', '', 'Audience'], ['reports', '', 'Rapports'], ['orders', '', 'Commandes'], ['products', '', 'Produits'], ['categories', '', 'Catégories'],
+  ['customers', '', 'Clients'], ['promos', '', 'Codes promo'], ['sep', '', 'Administration'],
+  ['settings', '', 'Paramètres', 1], ['users', '', 'Utilisateurs', 1], ['activity', '', 'Journal', 1],
 ];
 function buildShell() {
   $('#nav').innerHTML = NAV.filter(n => !n[3] || A.user.role === 'admin').map(n => n[0] === 'sep' && A.user.role !== 'admin' ? '' :
@@ -145,7 +145,9 @@ A.route(/^\/dashboard$/, async (view) => {
     const yl = ticks.map(t => `<line class="grid" x1="${L}" x2="${W}" y1="${t.y}" y2="${t.y}"/><text x="${L - 6}" y="${t.y + 4}" text-anchor="end">${t.v >= 1000 ? Math.round(t.v / 1000) + 'k' : t.v}</text>`).join('');
     const maxCat = Math.max(1, ...d.categories.map(x => x.revenue));
     let ins = []; try { ins = (await api('admin/insights')).insights; } catch { /* facultatif */ }
+    const pl = d.plan, banner = pl && pl.days_left !== null && pl.days_left <= 7 ? `<div class="card" style="margin-bottom:1rem;border-color:${pl.days_left < 0 ? '#c0392b' : '#E6B422'};background:${pl.days_left < 0 ? '#FDECEA' : '#FFF8E1'}"><b>${pl.days_left < 0 ? `Abonnement expiré : votre boutique sera suspendue dans ${Math.max(0, pl.grace_days + pl.days_left)} jour(s)` : pl.days_left === 0 ? 'Votre abonnement expire aujourd’hui' : `Votre abonnement expire dans ${pl.days_left} jour(s)`}</b><p class="small" style="margin:.3rem 0 0">Renouvelez-le pour que vos clients gardent accès à la boutique. <a href="#/settings">Renouveler maintenant</a></p></div>` : '';
     $('#dashBody').innerHTML = `
+      ${banner}
       ${ins.length ? `<div class="card" style="margin-bottom:1rem"><h2>À savoir <a href="#/audience" class="small">Toute l'audience</a></h2>${insightsHtml(ins)}</div>` : ''}
       <div class="kpis">
         <div class="kpi"><div class="l">Chiffre d'affaires</div><div class="v">${fcfa(c.revenue)}</div>${delta(c.revenue, p.revenue)}</div>
@@ -175,7 +177,58 @@ A.route(/^\/dashboard$/, async (view) => {
   await draw();
 }, 'dashboard');
 
-const insightsHtml = (l) => l.length ? `<div class="insights">${l.map(i => `<div class="ins l-${i.level}"><span class="ico">${i.level === 'good' ? '✅' : i.level === 'warn' ? '⚠️' : '💡'}</span><div><b>${esc(i.title)}</b><p>${esc(i.text)}</p>${i.link ? `<a class="small" href="${esc(i.link)}">Agir →</a>` : ''}</div></div>`).join('')}</div>` : '<p class="muted small">Rien à signaler : tout va bien.</p>';
+const insightsHtml = (l) => l.length ? `<div class="insights">${l.map(i => `<div class="ins l-${i.level}"><span class="ico">${i.level === 'good' ? 'Bien' : i.level === 'warn' ? 'Attention' : 'Conseil'}</span><div><b>${esc(i.title)}</b><p>${esc(i.text)}</p>${i.link ? `<a class="small" href="${esc(i.link)}">Agir →</a>` : ''}</div></div>`).join('')}</div>` : '<p class="muted small">Rien à signaler : tout va bien.</p>';
+// ══ Rapports personnalisés ════════════════════════════════
+A.route(/^\/reports$/, async (view) => {
+  const iso = d => d.toISOString().slice(0, 10), now = new Date(), ago = n => iso(new Date(Date.now() - n * 864e5));
+  let cfg = JSON.parse(sessionStorage.getItem('fq_rep') || 'null') || { dataset: 'orders', group: 'month', from: ago(89), to: iso(now) }, meta = null, timer = 0;
+  const FILTERS = { status: ['Statut', Object.entries(STATUS)], payment: ['Paiement', [['unpaid', 'Non payée'], ['paid', 'Payée']]] };
+  const presets = [['7 jours', 6, null], ['30 jours', 29, null], ['90 jours', 89, null], ['Ce mois', 'm0'], ['Mois dernier', 'm1'], ['Cette année', 'y']];
+  const range = p => { if (typeof p[1] === 'number') return [ago(p[1]), iso(now)]; if (p[1] === 'y') return [`${now.getFullYear()}-01-01`, iso(now)]; const o = +p[1][1], a = new Date(now.getFullYear(), now.getMonth() - o, 1), b = o ? new Date(now.getFullYear(), now.getMonth(), 0) : now; const f = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; return [f(a), f(b)]; };
+  const q = () => JSON.stringify(cfg);
+  const cell = (v, t) => v === null || v === undefined ? '' : typeof v === 'number' ? (t === 'pct' ? v + ' %' : t === 'text' ? v : v.toLocaleString('fr-FR')) : esc(v);
+  const load = async () => {
+    const d = await api('admin/report', { params: { c: q() } }); meta = d; cfg = d.config; sessionStorage.setItem('fq_rep', q());
+    const def = d.catalog[cfg.dataset], cols = def.columns[cfg.group] || def.columns['*'], r = d.result;
+    $('#rDs').innerHTML = Object.entries(d.catalog).map(([k, v]) => `<option value="${k}" ${k === cfg.dataset ? 'selected' : ''}>${esc(v.label)}</option>`).join('');
+    $('#rGroup').innerHTML = def.groups.map(g => `<option value="${g.key}" ${g.key === cfg.group ? 'selected' : ''}>${esc(g.label)}</option>`).join('');
+    $('#rPeriod').hidden = !def.period; $('#rFrom').value = cfg.from; $('#rTo').value = cfg.to;
+    $('#rFilters').innerHTML = def.filters.map(f => f === 'category' ? `<label class="f">Catégorie<select data-f="category"><option value="">Toutes</option>${d.categories.map(c => `<option ${c === cfg.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>` : `<label class="f">${FILTERS[f][0]}<select data-f="${f}"><option value="">Tous</option>${FILTERS[f][1].map(([k, l]) => `<option value="${k}" ${cfg[f] === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`).join('');
+    $('#rCols').innerHTML = cols.map(c => `<label class="chk"><input type="checkbox" value="${c.key}" ${cfg.columns.includes(c.key) ? 'checked' : ''}> ${esc(c.label)}</label>`).join('');
+    $('#rTitle').textContent = r.title;
+    $('#rTable').innerHTML = `<thead><tr>${r.columns.map(c => `<th style="${c.type !== 'text' ? 'text-align:right' : ''}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${r.rows.map(row => `<tr>${row.map((v, i) => `<td style="${r.columns[i].type !== 'text' ? 'text-align:right;white-space:nowrap' : ''}">${cell(v, r.columns[i].type)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${r.columns.length || 1}" class="muted" style="padding:1.2rem">Aucune donnée sur cette période.</td></tr>`}${r.totals ? `<tr style="font-weight:700;background:var(--mint)">${r.totals.map((v, i) => `<td style="${r.columns[i].type !== 'text' ? 'text-align:right;white-space:nowrap' : ''}">${cell(v, r.columns[i].type)}</td>`).join('')}</tr>` : ''}</tbody>`;
+    $('#rNote').textContent = r.total_rows > 200 ? `Aperçu : 200 lignes sur ${r.total_rows}. Les exports contiennent tout.` : `${r.total_rows} ligne${r.total_rows > 1 ? 's' : ''}`;
+    const link = f => `/api/index.php?${new URLSearchParams({ r: 'admin/report/export', format: f, c: q() })}`;
+    $('#xCsv').href = link('csv'); $('#xXlsx').href = link('xlsx'); $('#xPdf').href = link('pdf');
+  };
+  const refresh = (delay = 250) => { clearTimeout(timer); timer = setTimeout(() => load().catch(fail), delay); };
+  const saved = async () => {
+    const d = await api('admin/reports');
+    $('#rSaved').innerHTML = d.reports.length ? d.reports.map(x => `<div class="it"><div class="g"><b>${esc(x.name)}</b><span class="muted small">${esc(meta?.catalog[x.config.dataset]?.label || x.config.dataset)}</span></div><button class="btn sm" data-open="${x.id}">Ouvrir</button><button class="btn sm danger" data-del="${x.id}" aria-label="Supprimer">✕</button></div>`).join('') : '<p class="muted small">Aucun rapport enregistré. Configurez un rapport puis cliquez sur « Enregistrer ».</p>';
+    $('#rSaved')._r = d.reports;
+  };
+  view.innerHTML = `<div class="page-head"><h1>Rapports</h1><div class="grow"></div><a class="btn" id="xCsv" href="#">CSV</a><a class="btn" id="xXlsx" href="#">Excel</a><a class="btn main" id="xPdf" href="#">PDF</a></div>
+    <div class="dash-grid"><div class="card wide stack"><h2>Configurer le rapport</h2>
+      <div class="grid2"><label class="f">Données<select id="rDs"></select></label><label class="f">Regrouper<select id="rGroup"></select></label></div>
+      <div id="rPeriod" class="stack"><div class="grid2"><label class="f">Du<input type="date" id="rFrom"></label><label class="f">Au<input type="date" id="rTo"></label></div><div class="seg" id="rPre">${presets.map((p, i) => `<button type="button" data-i="${i}">${p[0]}</button>`).join('')}</div></div>
+      <div class="grid2" id="rFilters"></div>
+      <div><div class="small muted" style="margin-bottom:.35rem">Colonnes à inclure</div><div id="rCols" style="display:flex;flex-wrap:wrap;gap:.4rem 1.1rem"></div></div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center"><button class="btn" id="rSave" type="button">Enregistrer ce rapport</button><span class="muted small">Les exports reprennent exactement ces réglages.</span></div></div>
+      <div class="card"><h2>Mes rapports</h2><div class="list" id="rSaved"></div></div></div>
+    <div class="card" style="margin-top:1rem"><h2 id="rTitle">Aperçu</h2><div class="tbl-wrap" style="max-height:480px;overflow:auto"><table id="rTable"></table></div><p class="muted small" id="rNote" style="margin-top:.5rem"></p></div>`;
+  $('#rDs').addEventListener('change', e => { cfg = { dataset: e.target.value, from: cfg.from, to: cfg.to }; refresh(0); });
+  $('#rGroup').addEventListener('change', e => { cfg.group = e.target.value; cfg.columns = []; refresh(0); });
+  $('#rFrom').addEventListener('change', e => { cfg.from = e.target.value; refresh(); }); $('#rTo').addEventListener('change', e => { cfg.to = e.target.value; refresh(); });
+  $('#rPre').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; [cfg.from, cfg.to] = range(presets[+b.dataset.i]); refresh(0); });
+  $('#rFilters').addEventListener('change', e => { cfg[e.target.dataset.f] = e.target.value; refresh(0); });
+  $('#rCols').addEventListener('change', () => { cfg.columns = $$('#rCols input:checked').map(i => i.value); refresh(0); });
+  $('#rSave').addEventListener('click', async () => { const name = prompt('Nom du rapport :', meta?.result.title.split(' (')[0] || ''); if (!name) return; try { await api('admin/reports', { method: 'POST', body: { name, config: cfg } }); toast('Rapport enregistré'); await saved(); } catch (e) { fail(e); } });
+  $('#rSaved').addEventListener('click', async e => { const o = e.target.closest('[data-open]'), d = e.target.closest('[data-del]');
+    if (o) { cfg = $('#rSaved')._r.find(x => x.id == o.dataset.open).config; await load(); scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (d && confirm('Supprimer ce rapport enregistré ?')) { try { await api('admin/reports', { method: 'DELETE', params: { id: d.dataset.del } }); await saved(); } catch (x) { fail(x); } } });
+  await load(); await saved();
+}, 'reports');
+
 // ══ Audience ══════════════════════════════════════════════
 A.route(/^\/audience$/, async (view) => {
   let days = +(sessionStorage.getItem('fq_days') || 30);
@@ -208,7 +261,7 @@ A.route(/^\/audience$/, async (view) => {
         <div class="card"><h2>Produits les plus ajoutés au panier</h2>${bars(d.top_carted)}</div>
         <div class="card"><h2>Appareils</h2>${bars(dev)}</div>
         <div class="card"><h2>Contacts</h2>${bars(cl)}</div>
-        <div class="card"><h2>Google Analytics et Pixel Meta</h2><p class="small">${d.integrations.ga4 ? '✅ Google Analytics actif' : '⚪ Google Analytics non configuré'}<br>${d.integrations.pixel ? '✅ Pixel Meta actif' : '⚪ Pixel Meta non configuré'}</p><p class="muted small">Ajoutez vos identifiants dans Paramètres → Boutique. Les visiteurs qui activent « Ne pas suivre » ne sont comptés nulle part.</p></div>
+        <div class="card"><h2>Google Analytics et Pixel Meta</h2><p class="small">${d.integrations.ga4 ? 'Google Analytics actif' : 'Google Analytics non configuré'}<br>${d.integrations.pixel ? 'Pixel Meta actif' : 'Pixel Meta non configuré'}</p><p class="muted small">Ajoutez vos identifiants dans Paramètres → Boutique. Les visiteurs qui activent « Ne pas suivre » ne sont comptés nulle part.</p></div>
       </div>`;
   };
   view.innerHTML = `<div class="page-head"><h1>Audience</h1><div class="grow"></div><div class="seg" id="range">${[7, 30, 90].map(n => `<button data-d="${n}" class="${n === days ? 'on' : ''}">${n} jours</button>`).join('')}</div></div><div id="audBody"></div>`;
@@ -219,7 +272,7 @@ A.route(/^\/audience$/, async (view) => {
 // ══ Commandes ═════════════════════════════════════════════
 A.route(/^\/orders(?:\/(\d+))?(?:\?.*)?$/, async (view, openId) => {
   const f = { status: '', q: '', from: '', to: '', payment: '', page: 1 };
-  view.innerHTML = `<div class="page-head"><h1>Commandes</h1><div class="grow"></div><a class="btn" id="exp" href="#">⬇ Exporter CSV</a></div>
+  view.innerHTML = `<div class="page-head"><h1>Commandes</h1><div class="grow"></div><a class="btn" id="exp" href="#">Exporter CSV</a></div>
     <div class="tabs" id="tabs"></div>
     <div class="toolbar"><input type="search" id="q" placeholder="N°, nom ou téléphone…"><label class="small muted">Du <input type="date" id="from" style="width:auto"></label><label class="small muted">au <input type="date" id="to" style="width:auto"></label>
       <select id="pay"><option value="">Tous paiements</option><option value="unpaid">Non payées</option><option value="paid">Payées</option></select></div>
@@ -246,9 +299,9 @@ async function openOrder(id, reload) {
   const o = await api('admin/order', { params: { id } });
   const show = o => {
     const m = modal(`<h2>${esc(o.number)} ${pill(o.status, o.status_label)}<button data-close aria-label="Fermer">✕</button></h2>
-      <div class="grid2" style="margin-bottom:1rem"><div><b>${esc(o.customer_name)}</b><div>${esc(o.customer_phone)}</div><div class="muted small">${o.delivery_mode === 'pickup' ? '🏬 Retrait en boutique' : '📍 ' + esc(o.customer_address)}</div>${o.note ? `<div class="notice small" style="margin-top:.5rem">📝 ${esc(o.note)}</div>` : ''}</div>
-        <div class="stack" style="align-content:start"><a class="btn wa" target="_blank" rel="noopener" href="${esc(o.whatsapp_customer_url)}">💬 Écrire au client</a><a class="btn" href="tel:+${esc(o.customer_phone)}">📞 Appeler</a></div></div>
-      ${o.archived ? '<div class="notice small" style="margin-bottom:.6rem">🗄️ Commande ancienne : le détail des articles a été archivé pour alléger la base. Les montants, la date et le client sont conservés.</div>' : ''}<table class="otable">${o.items.map(i => `<tr><td>${i.thumb ? `<img class="thumb" style="width:36px;height:36px" src="${esc(i.thumb)}" alt="">` : ''}</td><td>${esc(i.name)}${i.variant_label ? ` <span class="muted">(${esc(i.variant_label)})</span>` : ''}</td><td class="right nowrap">${i.qty} × ${fcfa(i.unit_price)}</td><td class="right nowrap"><b>${fcfa(i.qty * i.unit_price)}</b></td></tr>`).join('')}
+      <div class="grid2" style="margin-bottom:1rem"><div><b>${esc(o.customer_name)}</b><div>${esc(o.customer_phone)}</div><div class="muted small">${o.delivery_mode === 'pickup' ? 'Retrait en boutique' : '' + esc(o.customer_address)}</div>${o.note ? `<div class="notice small" style="margin-top:.5rem">${esc(o.note)}</div>` : ''}</div>
+        <div class="stack" style="align-content:start"><a class="btn wa" target="_blank" rel="noopener" href="${esc(o.whatsapp_customer_url)}">Écrire au client</a><a class="btn" href="tel:+${esc(o.customer_phone)}">Appeler</a></div></div>
+      ${o.archived ? '<div class="notice small" style="margin-bottom:.6rem">Commande ancienne : le détail des articles a été archivé pour alléger la base. Les montants, la date et le client sont conservés.</div>' : ''}<table class="otable">${o.items.map(i => `<tr><td>${i.thumb ? `<img class="thumb" style="width:36px;height:36px" src="${esc(i.thumb)}" alt="">` : ''}</td><td>${esc(i.name)}${i.variant_label ? ` <span class="muted">(${esc(i.variant_label)})</span>` : ''}</td><td class="right nowrap">${i.qty} × ${fcfa(i.unit_price)}</td><td class="right nowrap"><b>${fcfa(i.qty * i.unit_price)}</b></td></tr>`).join('')}
         <tr class="t"><td colspan=3 class="right" style="font-weight:400">Sous-total</td><td class="right">${fcfa(o.subtotal)}</td></tr>
         ${o.discount ? `<tr><td colspan=3 class="right muted">Remise ${esc(o.promo_code)}</td><td class="right">-${fcfa(o.discount)}</td></tr>` : ''}
         <tr><td colspan=3 class="right muted">Livraison</td><td class="right">${o.delivery_mode === 'pickup' ? 'Retrait' : fcfa(o.delivery_fee)}</td></tr>
@@ -256,8 +309,8 @@ async function openOrder(id, reload) {
       <div class="steps" style="margin:1rem 0 .6rem">${NEXT[o.status] ? `<button class="btn primary" data-st="${NEXT[o.status][0]}">${NEXT[o.status][1]}</button>` : ''}
         ${o.status !== 'cancelled' && o.status !== 'delivered' ? '<button class="btn danger" data-st="cancelled">Annuler la commande</button>' : ''}
         ${o.status === 'cancelled' ? '<button class="btn" data-st="new">Rouvrir</button>' : ''}
-        <button class="btn" data-pay="${o.payment_status === 'paid' ? 'unpaid' : 'paid'}">${o.payment_status === 'paid' ? '✓ Payée (annuler)' : '💵 Marquer payée'}</button>
-        <button class="btn ghost" id="print">🖨 Bon de livraison</button></div>
+        <button class="btn" data-pay="${o.payment_status === 'paid' ? 'unpaid' : 'paid'}">${o.payment_status === 'paid' ? '✓ Payée (annuler)' : 'Marquer payée'}</button>
+        <button class="btn ghost" id="print">Bon de livraison</button></div>
       <label class="f">Note interne<textarea id="anote" placeholder="Visible uniquement par l'équipe">${esc(o.admin_note)}</textarea></label>
       <div style="margin-top:.5rem"><button class="btn sm" id="saveNote">Enregistrer la note</button></div>
       <h3 style="font-size:.9rem;margin:1.2rem 0 .5rem">Historique</h3>${o.events.map(e => `<div class="ev">${esc(e.detail || e.type)}<small>${fmtDT(e.created_at)} · ${esc(e.username)}</small></div>`).join('')}

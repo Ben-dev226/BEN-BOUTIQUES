@@ -6,4 +6,3 @@ node_modules
 public/uploads
 *.tsbuildinfo
 next-env.d.ts
-.env.example

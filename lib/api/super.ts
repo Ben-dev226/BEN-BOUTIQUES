@@ -8,6 +8,10 @@ import { createTenant, shopsEverCreated, LIFETIME_MAX_SHOPS } from '../tenants';
 import { forgetTenants } from '../tenant';
 import { deleteObjects } from '../storage';
 import { report } from '../analytics';
+import { impact, ackProblem, reauth, blockTenant, unblockTenant, banTenant, unbanTenant, scheduleDelete, cancelDelete, deleteNow } from '../moderation';
+import { listRequests, approveRequest, rejectRequest, signupMode, trialDays } from '../signup';
+import { performanceReport } from '../watch';
+import { flush } from '../perf';
 import { platformInsights } from '../insights';
 import { recentPayments } from '../billing';
 import { vercelEnabled, addDomain, removeDomain, domainStatus, verifyDomain } from '../vercel';
@@ -35,7 +39,7 @@ async function session(r: SReq) {
   } catch { return null; }
 }
 
-const SELECT = `SELECT t.id, t.slug, t.name, t.status, t.plan, t.max_products, t.max_users, t.paid_until::text AS paid_until, t.custom_domain, t.created_at,
+const SELECT = `SELECT t.id, t.slug, t.name, t.status, t.plan, t.max_products, t.max_users, t.paid_until::text AS paid_until, t.custom_domain, t.created_at, t.banned, t.blocked_reason, t.blocked_at, t.ban_reason, t.delete_after::text AS delete_after,
   (SELECT COUNT(*)::int FROM products p WHERE p.tenant_id = t.id) AS products, (SELECT COUNT(*)::int FROM orders o WHERE o.tenant_id = t.id) AS orders,
   (SELECT COALESCE(SUM(total),0)::int FROM orders o WHERE o.tenant_id = t.id AND o.status <> 'cancelled') AS revenue,
   (SELECT MAX(created_at) FROM orders o WHERE o.tenant_id = t.id) AS last_order, (SELECT COUNT(*)::int FROM users u WHERE u.tenant_id = t.id) AS users FROM tenants t`;
@@ -91,6 +95,10 @@ export async function superHandle(r: SReq, route: string): Promise<{ data?: unkn
     const types = await rows('SELECT DISTINCT type FROM platform_events ORDER BY type');
     return { data: { health: await healthReport(), counts24h: Object.fromEntries(c24.map(x => [x.level, x.n])), failed_ips: failed, types: types.map(x => x.type), events } };
   }
+  if (route === 'signups' && r.method === 'GET') return { data: { requests: await listRequests(), mode: signupMode(), trial_days: trialDays() } };
+  if (route === 'signups/approve' && r.method === 'POST') { try { const o = await approveRequest(Number(r.body?.id)); await logInfo({ type: 'signup_approved', message: `Boutique ${o.slug} créée depuis une demande`, ip: r.ip }); return { data: o }; } catch (e: any) { fail(e.message, 400); } }
+  if (route === 'signups/reject' && r.method === 'POST') { try { await rejectRequest(Number(r.body?.id)); return { data: { ok: true } }; } catch (e: any) { fail(e.message, 400); } }
+  if (route === 'performance' && r.method === 'GET') { await flush(true); return { data: await performanceReport() }; }
   if (route === 'analytics' && r.method === 'GET') {
     const days = Math.max(7, Math.min(365, Number(r.url.searchParams.get('days')) || 30));
     const plat = await report(0, days);
@@ -99,7 +107,7 @@ export async function superHandle(r: SReq, route: string): Promise<{ data?: unkn
     return { data: { days, landing: plat, shops, insights: await platformInsights(days) } };
   }
   if (route === 'alert/test' && r.method === 'POST') {
-    await sendAlert(`✅ Test d'alerte envoyé depuis le panneau super-admin (${me!.email}).`); await logInfo({ type: 'alert_test', ip: r.ip, message: 'Test des alertes déclenché', detail: { by: me!.email } });
+    await sendAlert(`Test d'alerte envoyé depuis le panneau super-admin (${me!.email}).`); await logInfo({ type: 'alert_test', ip: r.ip, message: 'Test des alertes déclenché', detail: { by: me!.email } });
     return { data: { ok: true } };
   }
   if (route === '2fa/setup' && r.method === 'POST') {
@@ -147,7 +155,7 @@ export async function superHandle(r: SReq, route: string): Promise<{ data?: unkn
   if (route === 'tenant' && r.method === 'PUT') {
     const b = r.body, sets: string[] = [], v: unknown[] = []; const add = (c: string, x: unknown) => { v.push(x); sets.push(`${c} = $${v.length}`); };
     if ('name' in b) { const n = String(b.name).trim().slice(0, 80); if (!n) fail('Nom obligatoire'); add('name', n); }
-    if ('status' in b) { if (!['active', 'suspended'].includes(b.status)) fail('Statut invalide'); add('status', b.status); }
+    if ('status' in b) fail('Utilisez « Bloquer » / « Débloquer » : ces actions demandent un motif et des vérifications.');
     if ('plan' in b) add('plan', String(b.plan).trim().slice(0, 30) || 'free');
     if ('max_products' in b) add('max_products', intIn(b.max_products, 1, 100000, 'Limite produits'));
     if ('max_users' in b) add('max_users', intIn(b.max_users, 1, 100, 'Limite utilisateurs'));
@@ -173,16 +181,28 @@ export async function superHandle(r: SReq, route: string): Promise<{ data?: unkn
     await logWarn({ type: 'super_password_reset', tenantId: id, ip: r.ip, message: `Mot de passe « ${u} » réinitialisé (boutique #${id})`, detail: { by: me!.email } });
     return { data: { ok: true } };
   }
-  if (route === 'tenant' && r.method === 'DELETE') {
-    const t = await one('SELECT slug FROM tenants WHERE id = $1', [id]); if (!t) fail('Boutique introuvable', 404);
-    if (r.url.searchParams.get('confirm') !== t.slug) fail('Confirmation incorrecte : saisissez le slug de la boutique.');
-    const dom = (await one<{ custom_domain: string | null }>('SELECT custom_domain FROM tenants WHERE id = $1', [id]))?.custom_domain;
-    if (dom && vercelEnabled()) await removeDomain(dom);
-    const files = await rows('SELECT path, thumb FROM product_images WHERE tenant_id = $1', [id]);
-    await exec('DELETE FROM tenants WHERE id = $1', [id]); forgetTenants();
-    await deleteObjects(files.flatMap(f => [f.path, f.thumb]));
-    await logWarn({ type: 'super_tenant_deleted', ip: r.ip, message: `Boutique supprimée : ${t.slug}`, detail: { by: me!.email } });
-    return { data: { ok: true, note: 'Le plafond à vie continue de compter cette boutique.' } };
+  if (route === 'tenant' && r.method === 'DELETE') fail('Suppression directe désactivée : utilisez la suppression programmée (avec contrôles).', 405);
+  if (route === 'tenant/impact' && r.method === 'GET') { const a = r.url.searchParams.get('action'); if (!['block', 'ban', 'delete', 'purge'].includes(a || '')) fail('Action inconnue'); const i = await impact(id, a as any); if (!i) fail('Boutique introuvable', 404); return { data: i }; }
+  const mod = async (action: 'block' | 'ban' | 'delete' | 'purge', needAuth: boolean, needSlug: boolean, needReason: boolean) => {
+    const imp = await impact(id, action); if (!imp) fail('Boutique introuvable', 404);
+    const reason = String(r.body.reason ?? '').trim().slice(0, 300); if (needReason && reason.length < 3) fail('Indiquez le motif (3 caractères minimum).');
+    if (needSlug && String(r.body.confirm ?? '').trim() !== imp!.shop.slug) fail('Confirmation incorrecte : saisissez exactement l\'adresse (slug) de la boutique.');
+    const ap = ackProblem(imp!, r.body.ack); if (ap) fail(ap, 409);
+    if (needAuth) { const bad = await reauth(me!.id, r.body, r.ip); if (bad) fail(bad, 403); }
+    return { imp: imp!, reason };
+  };
+  if (route === 'tenant/block' && r.method === 'POST') { const { imp, reason } = await mod('block', false, false, true); if (imp.shop.banned) fail('Déjà bannie'); await blockTenant(id, reason, me!.email); return { data: { ok: true } }; }
+  if (route === 'tenant/unblock' && r.method === 'POST') { try { await unblockTenant(id, me!.email); } catch (e: any) { fail(e.message, 409); } return { data: { ok: true } }; }
+  if (route === 'tenant/ban' && r.method === 'POST') { const { reason } = await mod('ban', true, true, true); await banTenant(id, reason, me!.email); return { data: { ok: true } }; }
+  if (route === 'tenant/unban' && r.method === 'POST') { const bad = await reauth(me!.id, r.body, r.ip); if (bad) fail(bad, 403); await unbanTenant(id, me!.email); return { data: { ok: true } }; }
+  if (route === 'tenant/delete/schedule' && r.method === 'POST') { const { imp } = await mod('delete', true, true, false); if (imp.shop.delete_after) fail('Suppression déjà programmée'); await scheduleDelete(id, me!.email); return { data: { ok: true } }; }
+  if (route === 'tenant/delete/cancel' && r.method === 'POST') { await cancelDelete(id, me!.email); return { data: { ok: true } }; }
+  if (route === 'tenant/delete/now' && r.method === 'POST') {
+    const imp = await impact(id, 'purge'); if (!imp) fail('Boutique introuvable', 404);
+    if (!imp!.shop.delete_after) fail('Programmez d\'abord la suppression : elle ne peut pas être immédiate.', 409);
+    if (String(r.body.confirm ?? '').trim() !== imp!.shop.slug) fail('Confirmation incorrecte : saisissez exactement l\'adresse (slug) de la boutique.');
+    const bad = await reauth(me!.id, r.body, r.ip); if (bad) fail(bad, 403);
+    try { const slug = await deleteNow(id, me!.email); return { data: { ok: true, slug, note: 'Le plafond à vie continue de compter cette boutique.' } }; } catch (e: any) { fail(e.message, 409); }
   }
   if (route === 'password' && r.method === 'POST') {
     const pb = passwordProblem(String(r.body.new ?? ''), me!.email, 12); if (pb) fail(pb);

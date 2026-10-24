@@ -61,7 +61,7 @@ export default function Shell({ shop, nav = '', scripts = [], children }: { shop
             {s.hours && <span>{s.hours}</span>}
           </div>
         </div>
-        <p className="copy">© {new Date().getFullYear()} {s.shop_name} – Tous droits réservés</p>
+        <p className="copy">© {new Date().getFullYear()} {s.shop_name} – Tous droits réservés · <a href="/conditions">Conditions de vente</a> · <a href="/confidentialite">Confidentialité</a></p>
       </footer>
       {wa && (
         <a className="wa-float" href={`https://wa.me/${wa}?text=${encodeURIComponent("Bonjour, j'aimerais avoir des informations sur vos produits.")}`} target="_blank" rel="noopener noreferrer" aria-label="Discuter sur WhatsApp">

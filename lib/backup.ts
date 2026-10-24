@@ -197,7 +197,7 @@ export async function runBackup(trigger: 'cron' | 'manual' | 'before_cleanup' = 
     await exec(`DELETE FROM backups WHERE created_at < (now() AT TIME ZONE 'utc') - interval '180 days'`);
   } catch { /* table absente : ignoré */ }
   if (res.ok && res.remote_ok) await logInfo({ type: 'backup_ok', message: `Sauvegarde ${res.file_name} (${fmtMB(res.bytes)}) envoyée`, detail: res.destinations });
-  else { await logError({ type: 'backup_failed', message: `Sauvegarde non conservée : ${res.error}`, detail: res.destinations }); await sendAlert(`⚠️ SAUVEGARDE ÉCHOUÉE (${trigger}) — ${res.error}`); }
+  else { await logError({ type: 'backup_failed', message: `Sauvegarde non conservée : ${res.error}`, detail: res.destinations }); await sendAlert(`SAUVEGARDE ÉCHOUÉE (${trigger}) — ${res.error}`); }
   return res;
 }
 

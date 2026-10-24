@@ -23,8 +23,8 @@ export async function GET() {
         <div className="contact-card">
           <h2>Nous contacter</h2>
           {wa && <p><a className="btn btn-wa" href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer">Écrire sur WhatsApp</a></p>}
-          {s.address && <p>📍 {s.address}</p>}{s.hours && <p>🕐 {s.hours}</p>}
-          {s.email && <p>✉️ <a href={`mailto:${s.email}`}>{s.email}</a></p>}
+          {s.address && <p>{s.address}</p>}{s.hours && <p>{s.hours}</p>}
+          {s.email && <p><a href={`mailto:${s.email}`}>{s.email}</a></p>}
         </div>
       </section>
     </Shell>

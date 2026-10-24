@@ -120,7 +120,7 @@ export async function generateOrderNumber(tenantId: number, prefixSetting: strin
 }
 
 export function orderWhatsappMessage(o: any, items: any[], shopName: string, trackUrl: string): string {
-  const L = [`🛒 *Nouvelle commande ${shopName}*`, `N° *${o.number}*`, ''];
+  const L = [`*Nouvelle commande ${shopName}*`, `N° *${o.number}*`, ''];
   for (const it of items) {
     L.push(`• ${it.name}${it.variant_label ? ` (${it.variant_label})` : ''}`);
     L.push(`   ${it.qty} × ${fcfa(it.unit_price)} = *${fcfa(it.unit_price * it.qty)}*`);
@@ -128,9 +128,9 @@ export function orderWhatsappMessage(o: any, items: any[], shopName: string, tra
   L.push('', `Sous-total : ${fcfa(o.subtotal)}`);
   if (o.discount > 0) L.push(`Remise${o.promo_code ? ` (${o.promo_code})` : ''} : -${fcfa(o.discount)}`);
   if (o.delivery_mode === 'pickup') L.push('Retrait en boutique'); else if (o.delivery_fee > 0) L.push(`Livraison : ${fcfa(o.delivery_fee)}`);
-  L.push(`💰 *Total : ${fcfa(o.total)}*`, '', `👤 ${o.customer_name} – ${o.customer_phone}`);
-  if (o.delivery_mode === 'delivery' && o.customer_address) L.push(`📍 ${o.customer_address}`);
-  if (o.note) L.push(`📝 ${o.note}`);
+  L.push(`*Total : ${fcfa(o.total)}*`, '', `${o.customer_name} – ${o.customer_phone}`);
+  if (o.delivery_mode === 'delivery' && o.customer_address) L.push(`${o.customer_address}`);
+  if (o.note) L.push(`${o.note}`);
   L.push('', `Suivi : ${trackUrl}`);
   return L.join('\n');
 }

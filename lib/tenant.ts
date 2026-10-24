@@ -1,6 +1,6 @@
 import { one } from './db';
 
-export type Tenant = { id: number; slug: string; name: string; custom_domain: string | null; status: 'active' | 'suspended'; plan: string; max_products: number; max_users: number; paid_until: string | null };
+export type Tenant = { id: number; slug: string; name: string; custom_domain: string | null; status: 'active' | 'suspended'; plan: string; max_products: number; max_users: number; paid_until: string | null; grace?: boolean };
 
 const cache = new Map<string, { t: Tenant | null; exp: number }>();
 const COLS = 'id, slug, name, custom_domain, status, plan, max_products, max_users, paid_until::text AS paid_until';
@@ -9,7 +9,14 @@ export function cleanHost(h: string | null | undefined): string { return (h || '
 export const hostFromHeaders = (h: { get(k: string): string | null }) => cleanHost(h.get('x-forwarded-host') || h.get('host'));
 
 /** Abonnement échu (paid_until dépassée) ⇒ boutique traitée comme suspendue. Sans date : jamais d'échéance. */
-const effective = (t: Tenant | null | undefined): Tenant | null => !t ? null : (t.paid_until && t.paid_until < new Date().toISOString().slice(0, 10) ? { ...t, status: 'suspended' } : t);
+export const GRACE_DAYS = () => Math.max(0, Number(process.env.GRACE_DAYS ?? 3));
+const effective = (t: Tenant | null | undefined): Tenant | null => {
+  if (!t) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  if (!t.paid_until || t.paid_until >= today) return t;
+  const lim = new Date(new Date(t.paid_until + 'T00:00:00Z').getTime() + GRACE_DAYS() * 86400000).toISOString().slice(0, 10);
+  return lim >= today ? { ...t, grace: true } : { ...t, status: 'suspended' };   // échéance dépassée : période de grâce, puis suspension
+};
 
 export async function tenantBySlug(slug: string): Promise<Tenant | null> {
   return effective(await one<Tenant>(`SELECT ${COLS} FROM tenants WHERE slug = $1`, [slug]));

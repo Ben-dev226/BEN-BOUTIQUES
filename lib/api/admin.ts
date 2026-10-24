@@ -5,6 +5,10 @@ import { PRODUCT_SELECT, formatProduct, productImages, productVariants, productF
 import { listProducts } from './public';
 import { rateLimit } from './ctx';
 import { report } from '../analytics';
+import { GRACE_DAYS } from '../tenant';
+import { runReport, normalize as normReport, CATALOG as REPORTS } from '../reports';
+import { toXlsx } from '../xlsx';
+import { toPdf, cellText } from '../pdf';
 import { shopInsights } from '../insights';
 import { SETTING_DEFAULTS, LONG_SETTINGS, loadSettings, saveSetting, type Settings } from '../settings';
 import { assetUrl, deleteObjects, copyObject } from '../storage';
@@ -30,6 +34,31 @@ export async function adminAnalytics(ctx: Ctx) {
   return ctx.json({ days, series: r.series, totals: { ...r.totals, orders }, sources: r.sources, devices: r.devices, clicks: r.clicks, top_viewed: named(r.prod), top_carted: named(r.cart),
     insights: await shopInsights(tid, days, await ctx.settings()), conversion: r.totals.uv ? Math.round(orders / r.totals.uv * 1000) / 10 : 0, since: r.from, integrations: { ga4: !!(await ctx.settings()).ga4_id, pixel: !!(await ctx.settings()).meta_pixel_id } });
 }
+const cfgOf = (ctx: Ctx) => { try { return JSON.parse(ctx.q('c') || '{}'); } catch { return {}; } };
+export async function adminReport(ctx: Ctx) {
+  const cfg = normReport(cfgOf(ctx)), r = await runReport(ctx.tenant.id, cfg);
+  const cats = (await rows('SELECT name FROM categories WHERE tenant_id = $1 ORDER BY position, lower(name)', [ctx.tenant.id])).map((x: any) => x.name).concat('Sans catégorie');
+  return ctx.json({ config: cfg, catalog: REPORTS, categories: cats, result: { ...r, rows: r.rows.slice(0, 200), total_rows: r.rows.length } });
+}
+export async function adminReportExport(ctx: Ctx) {
+  const cfg = normReport(cfgOf(ctx)), r = await runReport(ctx.tenant.id, cfg), fmt = ctx.q('format') || 'csv', s = await ctx.settings();
+  const base = `rapport-${cfg.dataset}-${new Date().toISOString().slice(0, 10)}`;
+  await audit(ctx, 'report_export', 'report', null, `${cfg.dataset}/${cfg.group || 'detail'} ${fmt}`);
+  const hd = (type: string, name: string) => ({ 'Content-Type': type, 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' });
+  if (fmt === 'xlsx') return new Response(toXlsx(r, { shop: s.shop_name }) as any, { headers: hd('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', base + '.xlsx') });
+  if (fmt === 'pdf') return new Response((await toPdf(r, { shop: s.shop_name, color: s.primary_color })) as any, { headers: hd('application/pdf', base + '.pdf') });
+  return csvResponse(base + '.csv', r.columns.map(c => c.label), [...r.rows, ...(r.totals ? [r.totals] : [])].map(row => row.map((v, i) => v ?? '')));
+}
+export async function adminReportsList(ctx: Ctx) {
+  return ctx.json({ reports: (await rows('SELECT id, name, config, created_by, created_at FROM saved_reports WHERE tenant_id = $1 ORDER BY id DESC', [ctx.tenant.id])).map((x: any) => ({ id: x.id, name: x.name, config: JSON.parse(x.config), created_by: x.created_by, created_at: x.created_at })) });
+}
+export async function adminReportSave(ctx: Ctx) {
+  const b = await ctx.body(), name = cleanStr(b.name, 80); if (!name) fail('Donnez un nom au rapport');
+  if (Number(await val<number>('SELECT COUNT(*)::int FROM saved_reports WHERE tenant_id = $1', [ctx.tenant.id])) >= 25) fail('25 rapports enregistrés au maximum : supprimez-en un', 402);
+  const cfg = normReport(b.config || {}), row: any = await one('INSERT INTO saved_reports (tenant_id, name, config, created_by) VALUES ($1,$2,$3,$4) RETURNING id', [ctx.tenant.id, name, JSON.stringify(cfg), ctx.user?.username ?? '']);
+  return ctx.json({ id: row.id });
+}
+export async function adminReportDelete(ctx: Ctx) { await exec('DELETE FROM saved_reports WHERE id = $1 AND tenant_id = $2', [ctx.qint('id'), ctx.tenant.id]); return ctx.json({ ok: true }); }
 export async function adminInsights(ctx: Ctx) { return ctx.json({ insights: (await shopInsights(ctx.tenant.id, 30, await ctx.settings())).slice(0, 4) }); }
 export async function adminStats(ctx: Ctx) {
   const tid = ctx.tenant.id, days = Math.max(7, Math.min(365, ctx.qint('days', 30)));
@@ -62,7 +91,7 @@ export async function adminStats(ctx: Ctx) {
   return ctx.json({ days, current: cur, previous: prev, series, by_status: byStatus,
     top_products: top.map(r => ({ id: r.product_id, name: r.name, qty: r.qty, revenue: r.revenue, thumb: assetUrl(r.image ? thumbOf(r.image) : null) })),
     categories: cats.map(r => ({ name: r.cname, revenue: r.revenue })), pending_orders: pending, low_stock: low.map(r => formatProduct(r, s, true)), latest_orders: latest, counts,
-    plan: { name: ctx.tenant.plan, max_products: ctx.tenant.max_products, max_users: ctx.tenant.max_users, paid_until: ctx.tenant.paid_until, products: (counts as any).active_products + (counts as any).inactive_products } });
+    plan: { name: ctx.tenant.plan, max_products: ctx.tenant.max_products, max_users: ctx.tenant.max_users, paid_until: ctx.tenant.paid_until, days_left: ctx.tenant.paid_until ? Math.round((Date.parse(ctx.tenant.paid_until + 'T00:00:00Z') - Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z')) / 864e5) : null, grace: !!ctx.tenant.grace, grace_days: GRACE_DAYS(), products: (counts as any).active_products + (counts as any).inactive_products } });
 }
 
 // ── Produits ──────────────────────────────────────────────
@@ -383,7 +412,7 @@ export async function adminBackup(ctx: Ctx) {
 // ── Abonnement (paiement Chariow) ─────────────────────────
 export async function adminBilling(ctx: Ctx) {
   const t = ctx.tenant, today = new Date().toISOString().slice(0, 10), s = await ctx.settings();
-  return ctx.json({ plan: t.plan, paid_until: t.paid_until, expired: !!t.paid_until && t.paid_until < today, can_pay: billingEnabled(), options: billingPlans().map(({ id, ...o }) => ({ key: id, ...o })),
+  return ctx.json({ plan: t.plan, paid_until: t.paid_until, expired: !!t.paid_until && t.paid_until < today, grace: !!t.grace, can_pay: billingEnabled(), options: billingPlans().map(({ id, ...o }) => ({ key: id, ...o })),
     defaults: { email: s.email, whatsapp: s.whatsapp }, payments: await recentPayments(t.id) });
 }
 export async function adminBillingCheckout(ctx: Ctx) {

@@ -116,7 +116,7 @@ function render() {
   if (view === 'cart') {
     title.textContent = 'Mon panier';
     if (!cart.length) {
-      body.innerHTML = `<div class="empty-cart"><div class="big">🛍️</div><p>Votre panier est vide.<br>Ajoutez des articles pour commander.</p></div>`; foot.hidden = true; return;
+      body.innerHTML = `<div class="empty-cart"><div class="big"></div><p>Votre panier est vide.<br>Ajoutez des articles pour commander.</p></div>`; foot.hidden = true; return;
     }
     body.innerHTML = (issues.length ? `<div class="notice">${issues.map(i => esc(i.problem)).join('<br>')}</div>` : '') +
       cart.map(i => `<div class="line" data-k="${key(i.id, i.v)}">${thumb(i)}
@@ -136,7 +136,7 @@ function render() {
       <div id="coErr"></div>
       <label>Nom complet<input name="name" required autocomplete="name" value="${esc(me.name || '')}" maxlength="80"></label>
       <label>Téléphone / WhatsApp<input name="phone" required type="tel" inputmode="tel" autocomplete="tel" placeholder="70 12 34 56" value="${esc(me.phone || '')}"></label>
-      ${pick ? `<div class="seg"><label><input type="radio" name="mode" value="delivery" checked><span>🚚 Livraison</span></label><label><input type="radio" name="mode" value="pickup"><span>🏬 Retrait</span></label></div>` : '<input type="hidden" name="mode" value="delivery">'}
+      ${pick ? `<div class="seg"><label><input type="radio" name="mode" value="delivery" checked><span>Livraison</span></label><label><input type="radio" name="mode" value="pickup"><span>Retrait</span></label></div>` : '<input type="hidden" name="mode" value="delivery">'}
       <label id="addrWrap">Quartier / adresse de livraison<textarea name="address" maxlength="300" placeholder="Ex. : Gounghin, près de la pharmacie…">${esc(me.address || '')}</textarea></label>
       <label>Note (facultatif)<input name="note" maxlength="500" placeholder="Taille, couleur, heure de livraison…"></label>
       <div class="hp" aria-hidden="true"><input name="website" tabindex="-1" autocomplete="off"></div>
