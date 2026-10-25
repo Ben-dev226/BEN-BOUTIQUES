@@ -6,7 +6,7 @@ import { esc, shade, isHex } from './util';
 import { assetUrl } from './storage';
 import { resolveLook, FONTS } from './themes';
 
-const VER = '20261026';
+const VER = '20261027';
 export type Meta = { title?: string; description?: string; canonical?: string; image?: string; noindex?: boolean; type?: string; jsonld?: unknown; kind?: string; pid?: number; notrack?: boolean };
 
 /**

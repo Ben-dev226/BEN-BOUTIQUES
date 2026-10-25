@@ -12,7 +12,8 @@
   };
   if (!on) return;
   var today = new Date().toISOString().slice(0, 10), first = 1;
-  try { first = localStorage.getItem('fq_a') !== today; if (first) localStorage.setItem('fq_a', today); } catch (e) {}
+  var ak = 'fq_a' + ((window.FQ && FQ.base && FQ.base !== '/') ? FQ.base : '');   // une clé par boutique (sans domaine, elles partagent le même navigateur)
+  try { first = localStorage.getItem(ak) !== today; if (first) localStorage.setItem(ak, today); } catch (e) {}
   send({ t: 'pv', k: d.dataset.k, id: +d.dataset.id || 0, u: first ? 1 : 0, m: /Mobi|Android|iPhone/i.test(ua) ? 1 : 0, r: first ? document.referrer : '' });
   document.addEventListener('click', function (e) {
     var a = e.target.closest && e.target.closest('a[href]'); if (!a) return;

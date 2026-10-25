@@ -248,7 +248,7 @@ A.route(/^\/audience$/, async (view) => {
     $('#audBody').innerHTML = `
       <div class="card" style="margin-bottom:1rem"><h2>À savoir</h2>${insightsHtml(d.insights)}</div>
       <div class="kpis">
-        <div class="kpi"><div class="l">Visiteurs</div><div class="v">${t.uv}</div><span class="d flat">par jour, sans cookie</span></div>
+        <div class="kpi"><div class="l">Visiteurs</div><div class="v">${t.uv}</div><span class="d flat">visiteurs de chaque jour, additionnés</span></div>
         <div class="kpi"><div class="l">Pages vues</div><div class="v">${t.pv}</div><span class="d flat">${t.uv ? (t.pv / t.uv).toFixed(1) : '0'} par visiteur</span></div>
         <div class="kpi"><div class="l">Commandes</div><div class="v">${t.orders}</div><span class="d flat">sur la période</span></div>
         <div class="kpi"><div class="l">Conversion</div><div class="v">${d.conversion}%</div><span class="d flat">commandes / visiteurs</span></div>

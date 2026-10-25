@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
   try {
     const host = hostFromHeaders(req.headers), ip = clientIp(req.headers), ua = req.headers.get('user-agent') || '';
     const txt = (await req.text()).slice(0, 600);
+    if (/(^|;\s*)fq_session=/.test(req.headers.get('cookie') || '')) return new Response(null, { status: 204 });   // le marchand connecté (qui teste sa boutique) n'est pas compté
     const t = await tenantFromHeaders(req.headers).catch(() => null);
     const tid = t ? (t.status === 'active' ? t.id : -1) : isPlatformRoot(host) ? 0 : -1;
     if (tid >= 0) after(async () => { try { await record(tid, host, ip, ua, JSON.parse(txt)); } catch { /* la mesure ne doit jamais gêner */ } });   // réponse immédiate, comptage ensuite

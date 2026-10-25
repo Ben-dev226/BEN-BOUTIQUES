@@ -3,7 +3,7 @@ import { shopsEverCreated, LIFETIME_MAX_SHOPS } from '@/lib/tenants';
 import { one } from '@/lib/db';
 import { esc } from '@/lib/util';
 
-const VER = '20261020';
+const VER = '20261027';
 
 export async function landingPage(host: string): Promise<Response> {
   const name = process.env.PLATFORM_NAME || 'Ben-Dev Boutiques', root = process.env.ROOT_DOMAIN || '';

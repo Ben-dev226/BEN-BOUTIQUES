@@ -6,9 +6,11 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fcfa = n => Number(n || 0).toLocaleString('fr-FR').replace(/[  ]/g, ' ') + ' FCFA';
+/* Stockage propre à chaque boutique : sans domaine, toutes les boutiques partagent la même adresse (même localStorage), il faut donc préfixer. */
+const NS = BASE === '/' ? '' : BASE;
 const store = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  get(k, d) { try { const v = localStorage.getItem(NS + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(NS + k, JSON.stringify(v)); } catch {} }
 };
 
 async function api(route, { method = 'GET', params = {}, body, signal } = {}) {
