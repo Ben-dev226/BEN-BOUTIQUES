@@ -76,6 +76,8 @@ async function init(): Promise<Driver> {
 export function db(): Promise<Driver> { return (g.__db ??= init().catch(e => { g.__db = undefined; throw e; })); }
 
 export async function migrate(d: Driver): Promise<number> {
+  // chemin rapide (démarrage à froid) : une seule requête si tout est déjà appliqué, au lieu d'un aller-retour par migration
+  try { const v = await d.query('SELECT COALESCE(MAX(version), 0)::int AS v FROM schema_migrations'); if (Number(v.rows[0]?.v) >= MIGRATIONS.length) return 0; } catch { /* table absente : première installation */ }
   await d.query('CREATE TABLE IF NOT EXISTS schema_migrations (version INT PRIMARY KEY, applied_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE \'utc\'))');
   let applied = 0;
   for (const [i, sql] of MIGRATIONS.entries()) {

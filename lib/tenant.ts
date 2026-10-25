@@ -31,7 +31,7 @@ export async function tenantForHost(host: string, base = ''): Promise<Tenant | n
   const hit = cache.get(key);
   if (hit && hit.exp > Date.now()) return hit.t;
   const t = base ? effective(await tenantBySlug(base.slice(1))) : await lookup(host);
-  cache.set(key, { t, exp: Date.now() + (t ? 20_000 : 5_000) });
+  cache.set(key, { t, exp: Date.now() + (t ? 30_000 : 5_000) });
   return t;
 }
 export const forgetTenants = () => cache.clear();

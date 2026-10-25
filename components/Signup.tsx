@@ -35,7 +35,7 @@ else{o.innerHTML='<h2>Demande reçue.</h2><p class="lead">Nous vous écrivons su
 }).catch(function(){$('err').textContent='Connexion impossible, réessayez.';b.disabled=false;b.textContent='Créer ma boutique'})})})();`;
   const html = `<!DOCTYPE html>\n<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Créer ma boutique – ${esc(name)}</title><meta name="description" content="Ouvrez votre boutique en ligne en quelques minutes : catalogue, panier et commandes sur WhatsApp."><link rel="canonical" href="https://${esc(host)}/inscription"><meta name="theme-color" content="#0D3B2C">
-<link rel="preload" href="/fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/landing/landing.css?v=20261020"><link rel="stylesheet" href="/landing/signup.css?v=${VER}"></head>
+<link rel="icon" type="image/png" sizes="32x32" href="/icon/32"><link rel="apple-touch-icon" href="/icon/192"><link rel="preload" href="/fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/landing/landing.css?v=20261020"><link rel="stylesheet" href="/landing/signup.css?v=${VER}"></head>
 <body data-k="l"><main class="su"><a class="logo" href="/"><i></i>${esc(name)}</a><h1>Créez votre boutique</h1>${form}</main><script>${js}</script></body></html>`;
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 }

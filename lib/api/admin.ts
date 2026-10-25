@@ -10,9 +10,10 @@ import { runReport, normalize as normReport, CATALOG as REPORTS } from '../repor
 import { toXlsx } from '../xlsx';
 import { toPdf, cellText } from '../pdf';
 import { shopInsights } from '../insights';
-import { SETTING_DEFAULTS, LONG_SETTINGS, loadSettings, saveSetting, type Settings } from '../settings';
+import { legalDefaultText } from '../legal';
+import { SETTING_DEFAULTS, LONG_SETTINGS, loadSettings, saveSetting, saveSettings, type Settings } from '../settings';
 import { assetUrl, deleteObjects, copyObject } from '../storage';
-import { processProductImage, processLogo } from '../images';
+import { processProductImage, processLogo, processFavicon } from '../images';
 import { billingPlans, billingEnabled, startCheckout, splitPhone, recentPayments } from '../billing';
 import { originOf } from '../catalog';
 import { cleanStr, normalizePhone, randHex, isHex, safeHttpUrl } from '../util';
@@ -145,21 +146,28 @@ export async function adminProductSave(ctx: Ctx, update: boolean) {
       id = (await one('INSERT INTO products (tenant_id, slug, name, description, price, compare_price, sku, category_id, status, is_new, featured, track_stock, stock) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id',
         [tid, slug, name, desc, price, compare, sku, catId, status, !!b.is_new, !!b.featured, track, stock], t))!.id;
     }
-    const keep: number[] = [];
-    for (const [pos, v] of variants.entries()) {
-      if (v.id && await one('SELECT 1 FROM product_variants WHERE id = $1 AND product_id = $2', [v.id, id], t)) {
-        await exec('UPDATE product_variants SET label=$1, sku=$2, price=$3, stock=$4, position=$5, active=$6 WHERE id=$7 AND product_id=$8', [v.label, v.sku, v.price, v.stock, pos, v.active, v.id, id], t); keep.push(v.id);
-      } else keep.push((await one('INSERT INTO product_variants (tenant_id, product_id, label, sku, price, stock, position, active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [tid, id, v.label, v.sku, v.price, v.stock, pos, v.active], t))!.id);
-    }
+    // variantes : 1 lecture, 1 mise à jour groupée, 1 insertion groupée, 1 nettoyage
+    const existing = new Set((await rows<{ id: number }>('SELECT id FROM product_variants WHERE product_id = $1', [id], t)).map(r => r.id));
+    const upd = variants.map((v: any, pos: number) => ({ ...v, pos })).filter((v: any) => v.id && existing.has(v.id));
+    const ins = variants.map((v: any, pos: number) => ({ ...v, pos })).filter((v: any) => !(v.id && existing.has(v.id)));
+    const keep: number[] = upd.map((v: any) => v.id);
+    if (upd.length) await exec('UPDATE product_variants pv SET label = x.label, sku = x.sku, price = x.price, stock = x.stock, position = x.pos, active = x.active FROM (SELECT * FROM unnest($1::int[], $2::text[], $3::text[], $4::int[], $5::int[], $6::int[], $7::bool[]) AS u(id, label, sku, price, stock, pos, active)) x WHERE pv.id = x.id AND pv.product_id = $8',
+      [upd.map((v: any) => v.id), upd.map((v: any) => v.label), upd.map((v: any) => v.sku), upd.map((v: any) => v.price), upd.map((v: any) => v.stock), upd.map((v: any) => v.pos), upd.map((v: any) => v.active), id], t);
+    if (ins.length) keep.push(...(await rows<{ id: number }>('INSERT INTO product_variants (tenant_id, product_id, label, sku, price, stock, position, active) SELECT $1, $2, label, sku, price, stock, pos, active FROM unnest($3::text[], $4::text[], $5::int[], $6::int[], $7::int[], $8::bool[]) AS u(label, sku, price, stock, pos, active) RETURNING id',
+      [tid, id, ins.map((v: any) => v.label), ins.map((v: any) => v.sku), ins.map((v: any) => v.price), ins.map((v: any) => v.stock), ins.map((v: any) => v.pos), ins.map((v: any) => v.active)], t)).map(r => r.id));
     await exec('DELETE FROM product_variants WHERE product_id = $1 AND NOT (id = ANY($2::int[]))', [id, keep], t);
+    // images : mêmes principes
     const cur = await rows('SELECT id, path, thumb FROM product_images WHERE product_id = $1', [id], t);
     const newPaths = new Set(images.map((i: any) => i.path));
-    for (const r of cur) if (!newPaths.has(r.path)) { await exec('DELETE FROM product_images WHERE id = $1', [r.id], t); toDelete.push(r.path, r.thumb); }
+    const gone = cur.filter(r => !newPaths.has(r.path));
+    if (gone.length) { await exec('DELETE FROM product_images WHERE id = ANY($1::int[])', [gone.map(r => r.id)], t); for (const r of gone) toDelete.push(r.path, r.thumb); }
     const have = new Set(cur.map(r => r.path));
-    for (const [pos, im] of images.entries()) {
-      if (have.has(im.path)) await exec('UPDATE product_images SET position=$1, alt=$2 WHERE product_id=$3 AND path=$4', [pos, im.alt, id, im.path], t);
-      else await exec('INSERT INTO product_images (tenant_id, product_id, path, thumb, width, height, alt, position) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [tid, id, im.path, thumbOf(im.path), im.width, im.height, im.alt, pos], t);
-    }
+    const keepI = images.map((im: any, pos: number) => ({ ...im, pos })).filter((im: any) => have.has(im.path));
+    const addI = images.map((im: any, pos: number) => ({ ...im, pos })).filter((im: any) => !have.has(im.path));
+    if (keepI.length) await exec('UPDATE product_images pi SET position = x.pos, alt = x.alt FROM unnest($1::text[], $2::int[], $3::text[]) AS x(path, pos, alt) WHERE pi.product_id = $4 AND pi.path = x.path',
+      [keepI.map((im: any) => im.path), keepI.map((im: any) => im.pos), keepI.map((im: any) => im.alt), id], t);
+    if (addI.length) await exec('INSERT INTO product_images (tenant_id, product_id, path, thumb, width, height, alt, position) SELECT $1, $2, path, thumb, width, height, alt, pos FROM unnest($3::text[], $4::text[], $5::int[], $6::int[], $7::text[], $8::int[]) AS x(path, thumb, width, height, alt, pos)',
+      [tid, id, addI.map((im: any) => im.path), addI.map((im: any) => thumbOf(im.path)), addI.map((im: any) => im.width), addI.map((im: any) => im.height), addI.map((im: any) => im.alt), addI.map((im: any) => im.pos)], t);
   });
   await deleteObjects(toDelete);
   await audit(ctx, update ? 'product_update' : 'product_create', 'product', id, name);
@@ -273,6 +281,14 @@ export async function adminUpload(ctx: Ctx) {
     await audit(ctx, 'logo_update', 'settings');
     return ctx.json({ path, url: assetUrl(path) }, 201);
   }
+  if (ctx.q('kind') === 'favicon') {
+    const { path } = await processFavicon(buf, ctx.tenant.slug);
+    const old = (await ctx.settings()).favicon_url;
+    await saveSetting(ctx.tenant.id, 'favicon_url', path);
+    if (old && old.startsWith(ctx.tenant.slug + '/')) await deleteObjects([old]);
+    await audit(ctx, 'favicon_update', 'settings');
+    return ctx.json({ path, url: assetUrl(path) }, 201);
+  }
   const r = await processProductImage(buf, ctx.tenant.slug);
   return ctx.json({ ...r, url: assetUrl(r.path), thumb_url: assetUrl(r.thumb) }, 201);
 }
@@ -341,12 +357,12 @@ export async function adminCustomersExport(ctx: Ctx) {
 }
 
 // ── Paramètres, utilisateurs, journal, sauvegarde ─────────
-const settingsForAdmin = (s: Settings) => ({ ...s, logo_path: s.logo_url, logo_url: assetUrl(s.logo_url) ?? '' });
+const settingsForAdmin = (s: Settings) => ({ ...s, logo_path: s.logo_url, logo_url: assetUrl(s.logo_url) ?? '', favicon_url: assetUrl(s.favicon_url) ?? '' });
 export async function adminSettingsGet(ctx: Ctx) { return ctx.json({ settings: settingsForAdmin(await ctx.settings()) }); }
 export async function adminSettingsSave(ctx: Ctx) {
-  const b = await ctx.body(), changed: string[] = [];
+  const b = await ctx.body(), changed: string[] = [], cur = await ctx.settings(), batch: [string, string][] = [];
   for (const [k, raw] of Object.entries(b)) {
-    if (!(k in SETTING_DEFAULTS) || k === 'logo_url') continue;
+    if (!(k in SETTING_DEFAULTS) || k === 'logo_url' || k === 'favicon_url') continue;
     let v = cleanStr(raw, LONG_SETTINGS.includes(k) ? 2000 : 300);
     if (['delivery_fee', 'free_delivery_min', 'low_stock_threshold'].includes(k)) v = String(Math.max(0, parseInt(v, 10) || 0));
     if (k === 'whatsapp') { v = normalizePhone(v); if (v.length < 8) fail('Numéro WhatsApp invalide (format international, ex. 22670123456)'); }
@@ -359,10 +375,13 @@ export async function adminSettingsSave(ctx: Ctx) {
     if (k === 'ga4_id') { v = v.trim().toUpperCase(); if (v && !/^G-[A-Z0-9]{6,14}$/.test(v)) fail('ID Google Analytics invalide (format G-XXXXXXXXXX)'); }
     if (k === 'meta_pixel_id') { v = v.trim(); if (v && !/^\d{8,20}$/.test(v)) fail('ID Pixel Meta invalide (chiffres uniquement)'); }
     if (k === 'email' && v && !/^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/.test(v)) fail('Email invalide');
-    await saveSetting(ctx.tenant.id, k, v); changed.push(k);
+    if (k in cur && cur[k] === v) continue;                      // inchangé : ni écriture ni ligne de journal
+    batch.push([k, v]); changed.push(k);
   }
+  await saveSettings(ctx.tenant.id, batch);
+  if (b.remove_favicon) { const old = (await ctx.settings()).favicon_url; await saveSetting(ctx.tenant.id, 'favicon_url', ''); if (old) await deleteObjects([old]); changed.push('favicon'); }
   if (b.remove_logo) { const old = (await ctx.settings()).logo_url; await saveSetting(ctx.tenant.id, 'logo_url', ''); if (old) await deleteObjects([old]); changed.push('logo'); }
-  await audit(ctx, 'settings_update', 'settings', null, changed.join(', '));
+  if (changed.length) await audit(ctx, 'settings_update', 'settings', null, changed.map(k => k === 'primary_color' || LONG_SETTINGS.includes(k) || k.includes('_id') ? k : `${k}: ${String(b[k]).slice(0, 40)}`).join(', '));
   return ctx.json({ settings: settingsForAdmin(await loadSettings(ctx.tenant.id)) });
 }
 
@@ -430,4 +449,31 @@ export async function adminBillingCheckout(ctx: Ctx) {
     await audit(ctx, 'billing_checkout', 'tenant', ctx.tenant.id, plan.label);
     return ctx.json({ checkout_url: url });
   } catch (e: any) { return fail(e.message, 502); }
+}
+
+// ── Pages de la boutique (À propos, FAQ, Conditions, Confidentialité) ──
+export const FAQ_EXAMPLE = "## Comment passer commande ?\nAjoutez vos articles au panier puis validez : votre commande nous arrive sur WhatsApp et nous la confirmons avec vous.\n\n## Quels sont les délais de livraison ?\nIndiquez ici vos délais habituels par quartier ou par ville.\n\n## Puis-je échanger un article ?\nDécrivez ici votre politique d'échange.";
+const PAGE_MAX = 20000;
+export async function adminPagesGet(ctx: Ctx) {
+  const s = await ctx.settings(), terms = legalDefaultText('terms', s), privacy = legalDefaultText('privacy', s);
+  return ctx.json({ pages: [
+    { key: 'about', title: 'À propos', path: '/a-propos', body: s.about_text, model: SETTING_DEFAULTS.about_text, custom: s.about_text !== SETTING_DEFAULTS.about_text },
+    { key: 'faq', title: 'FAQ', path: '/faq', body: s.page_faq, model: FAQ_EXAMPLE, custom: !!s.page_faq.trim(), hint: 'Une question par titre : « ## Ma question », puis la réponse en dessous. La page /faq apparaît dans le pied de page dès qu\'elle contient du texte.' },
+    { key: 'terms', title: 'Conditions de vente', path: '/conditions', body: s.page_terms.trim() || terms, model: terms, custom: !!s.page_terms.trim() },
+    { key: 'privacy', title: 'Confidentialité', path: '/confidentialite', body: s.page_privacy.trim() || privacy, model: privacy, custom: !!s.page_privacy.trim() },
+  ] });
+}
+export async function adminPageSave(ctx: Ctx) {
+  const b = await ctx.body(), key = String(b.key || '');
+  if (!['about', 'faq', 'terms', 'privacy'].includes(key)) fail('Page inconnue');
+  const body = String(b.body ?? '').replace(/\r\n/g, '\n').trim();
+  if (body.length > PAGE_MAX) fail(`Texte trop long (${PAGE_MAX} caractères maximum)`, 413);
+  const s = await ctx.settings();
+  if (key === 'about') await saveSetting(ctx.tenant.id, 'about_text', body || SETTING_DEFAULTS.about_text);
+  else {
+    const model = key === 'terms' ? legalDefaultText('terms', s) : key === 'privacy' ? legalDefaultText('privacy', s) : '';
+    await saveSetting(ctx.tenant.id, 'page_' + key, body === model ? '' : body);   // identique au modèle ou vide : on garde le texte automatique
+  }
+  await audit(ctx, 'page_update', 'page', null, key);
+  return ctx.json({ ok: true });
 }

@@ -229,3 +229,10 @@ Super-admin → ligne de la boutique → **Modération**. Avant chaque action, u
 - Un paiement d'abonnement n'a pas de pouvoir de réactivation sur une boutique bloquée, bannie ou en cours de suppression.
 - Chaque action est inscrite au journal de la plateforme (les bannissements en niveau « sécurité » avec alerte).
 - Le plafond de 50 boutiques à vie est désormais un compteur dédié, incrémenté dans la transaction de création (une séquence PostgreSQL peut sauter jusqu'à 32 valeurs après un incident et fausser le compte).
+
+## 19. Pages, favicon et vitesse
+
+- **Pages de la boutique** : dans l'admin, menu **Pages**, chaque boutique modifie son À propos, sa FAQ, ses Conditions de vente et sa Confidentialité. Conditions et Confidentialité partent d'un texte modèle construit depuis les réglages de la boutique (à relire). La FAQ s'écrit « ## Question » puis la réponse ; la page /faq et son lien de pied de page n'existent que si elle contient du texte.
+- **Favicon** : Paramètres, Apparence, « Favicon ». Sans image, l'initiale du nom sur la couleur principale est utilisée. La plateforme a le sien (landing, super-admin).
+- **Adresse courte** : modifiable dans le super-admin (Modifier). Les images déjà envoyées sont déplacées automatiquement.
+- **Vitesse** : choisissez la région des fonctions Vercel (Settings, Functions, Region) la plus proche de votre base Supabase, et utilisez l'adresse « pooler » de Supabase dans DATABASE_URL. La distance entre les deux est la première cause de lenteur.

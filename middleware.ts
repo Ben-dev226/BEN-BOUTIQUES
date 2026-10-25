@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  * routage et transmis à l'application dans l'en-tête interne x-shop-base (toujours effacé s'il vient du client).
  */
 const PLATFORM = new Set(['api', 'setup', 'inscription', 'super', 'assets', 'fonts', 'landing', 'conditions', 'confidentialite', 'robots.txt', 'sitemap.xml', '_next', 'favicon.ico',
-  'admin', 'p', 'c', 'suivi', 'a-propos', 'icon', 'sw.js', 'manifest.webmanifest']);
+  'admin', 'faq', 'p', 'c', 'suivi', 'a-propos', 'icon', 'sw.js', 'manifest.webmanifest']);
 
 export function middleware(req: NextRequest) {
   const host = (req.headers.get('x-forwarded-host') || req.headers.get('host') || '').split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');

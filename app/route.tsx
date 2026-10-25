@@ -23,8 +23,7 @@ export async function GET(req: NextRequest) {
   for (const k of ['q', 'category', 'sort', 'min', 'max', 'promo', 'new', 'in_stock']) q[k] = sp.get(k) ?? '';
   const sort = SORTS.includes(q.sort) ? q.sort : '';
   const size = Number(process.env.PAGE_SIZE || 12);
-  const { products, total } = await queryProducts(shop, q, size, sort);
-  const cats = await rows(`SELECT c.name, c.slug, (SELECT COUNT(*)::int FROM products p WHERE p.category_id = c.id AND p.status = 'active') AS n FROM categories c WHERE c.tenant_id = $1 ORDER BY c.position, lower(c.name)`, [shop.tenant.id]);
+  const [{ products, total }, cats] = await Promise.all([queryProducts(shop, q, size, sort), rows(`SELECT c.name, c.slug, (SELECT COUNT(*)::int FROM products p WHERE p.category_id = c.id AND p.status = 'active') AS n FROM categories c WHERE c.tenant_id = $1 ORDER BY c.position, lower(c.name)`, [shop.tenant.id])]);
   const filtered = Object.entries(q).some(([k, v]) => k !== 'sort' && v !== '');
   const { s } = shop, wa = normalizePhone(s.whatsapp);
   const social = [s.facebook, s.instagram, s.tiktok].filter(Boolean);

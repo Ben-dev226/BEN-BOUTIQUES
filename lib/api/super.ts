@@ -6,6 +6,9 @@ import { newSecret, verifyTotp, otpauthUri } from '../totp';
 import QRCode from 'qrcode';
 import { createTenant, shopsEverCreated, LIFETIME_MAX_SHOPS } from '../tenants';
 import { forgetTenants } from '../tenant';
+import { RESERVED } from '../tenants';
+import { copyObject } from '../storage';
+import { forgetSettings } from '../settings';
 import { deleteObjects } from '../storage';
 import { report } from '../analytics';
 import { impact, ackProblem, reauth, blockTenant, unblockTenant, banTenant, unbanTenant, scheduleDelete, cancelDelete, deleteNow } from '../moderation';
@@ -156,6 +159,27 @@ export async function superHandle(r: SReq, route: string): Promise<{ data?: unkn
     const b = r.body, sets: string[] = [], v: unknown[] = []; const add = (c: string, x: unknown) => { v.push(x); sets.push(`${c} = $${v.length}`); };
     if ('name' in b) { const n = String(b.name).trim().slice(0, 80); if (!n) fail('Nom obligatoire'); add('name', n); }
     if ('status' in b) fail('Utilisez « Bloquer » / « Débloquer » : ces actions demandent un motif et des vérifications.');
+    if ('slug' in b) {
+      const cur = await one<{ slug: string }>('SELECT slug FROM tenants WHERE id = $1', [id]); if (!cur) fail('Boutique introuvable', 404);
+      const ns = String(b.slug || '').toLowerCase().trim();
+      if (ns !== cur!.slug) {
+        if (!/^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/.test(ns)) fail('Adresse invalide : 3 à 30 caractères (a-z, 0-9, tiret).');
+        if (RESERVED.includes(ns)) fail(`« ${ns} » est un nom réservé.`);
+        if (await one('SELECT 1 FROM tenants WHERE slug = $1 AND id <> $2', [ns, id])) fail('Cette adresse est déjà prise.');
+        // images rangées sous l'ancienne adresse : on les copie sous la nouvelle, on met la base à jour, puis on supprime les anciennes
+        const oldP = cur!.slug + '/', newP = ns + '/';
+        const imgs = await rows<{ id: number; path: string; thumb: string }>('SELECT id, path, thumb FROM product_images WHERE tenant_id = $1', [id]);
+        const sets2 = await rows<{ k: string; v: string }>(`SELECT k, v FROM settings WHERE tenant_id = $1 AND k IN ('logo_url','favicon_url') AND v LIKE $2`, [id, oldP + '%']);
+        const keys = [...new Set([...imgs.flatMap(i => [i.path, i.thumb]), ...sets2.map(x => x.v)].filter(k => k && k.startsWith(oldP)))];
+        for (const k of keys) await copyObject(k, newP + k.slice(oldP.length)).catch(e => fail('Copie des images impossible : ' + e.message));
+        const mv = (k: string) => (k && k.startsWith(oldP) ? newP + k.slice(oldP.length) : k);
+        for (const i of imgs) await exec('UPDATE product_images SET path = $2, thumb = $3 WHERE id = $1', [i.id, mv(i.path), mv(i.thumb)]);
+        for (const x of sets2) await exec('UPDATE settings SET v = $3 WHERE tenant_id = $1 AND k = $2', [id, x.k, mv(x.v)]);
+        forgetSettings(id);
+        await deleteObjects(keys).catch(() => {});
+        add('slug', ns);
+      }
+    }
     if ('plan' in b) add('plan', String(b.plan).trim().slice(0, 30) || 'free');
     if ('max_products' in b) add('max_products', intIn(b.max_products, 1, 100000, 'Limite produits'));
     if ('max_users' in b) add('max_users', intIn(b.max_users, 1, 100, 'Limite utilisateurs'));

@@ -16,7 +16,7 @@ export async function GET() {
   }
   const o = shop.origin, tid = shop.tenant.id;
   const u = (loc: string, mod?: string, pri = '0.6') => `<url><loc>${esc(loc)}</loc>${mod ? `<lastmod>${esc(mod.slice(0, 10))}</lastmod>` : ''}<priority>${pri}</priority></url>`;
-  const out = [u(o + '/', undefined, '1.0'), u(o + '/a-propos', undefined, '0.4'), u(o + '/conditions', undefined, '0.2'), u(o + '/confidentialite', undefined, '0.2')];
+  const out = [u(o + '/', undefined, '1.0'), u(o + '/a-propos', undefined, '0.4'), ...(shop.s.page_faq.trim() ? [u(o + '/faq', undefined, '0.4')] : []), u(o + '/conditions', undefined, '0.2'), u(o + '/confidentialite', undefined, '0.2')];
   const abs = (u: string) => (/^https?:\/\//.test(u) ? u : o + u);
   const imgs = new Map<number, string[]>();
   for (const i of await rows('SELECT product_id, path FROM product_images WHERE tenant_id = $1 ORDER BY position, id', [tid])) { const l = imgs.get(i.product_id) ?? []; if (l.length < 5) l.push(abs(assetUrl(i.path) || '')); imgs.set(i.product_id, l); }

@@ -2,15 +2,16 @@ import Shell from '@/components/Shell';
 import { platformPage } from '@/components/PlatformHome';
 import { htmlPage } from '@/lib/html';
 import { getShop } from '@/lib/shop';
-import { normalizePhone } from '@/lib/util';
+import { normalizePhone, renderRich } from '@/lib/util';
 
 type Sec = [string, string[]];
-const page = async (kind: 'privacy' | 'terms') => {
-  const shop = await getShop(); if (!shop) return platformPage();
-  const s = shop.s, wa = normalizePhone(s.whatsapp), contact = [wa && `WhatsApp : +${wa}`, s.email, s.address].filter(Boolean).join(' · ') || 'via les moyens de contact indiqués en bas de page';
+export type LegalKind = 'privacy' | 'terms';
+/** Texte modèle (modifiable par chaque boutique) : sections « titre + paragraphes » construites depuis ses réglages. */
+export function legalSections(kind: LegalKind, s: Record<string, string>): Sec[] {
+  const wa = normalizePhone(s.whatsapp), contact = [wa && `WhatsApp : +${wa}`, s.email, s.address].filter(Boolean).join(' · ') || 'via les moyens de contact indiqués en bas de page';
   const days = Math.max(90, Number(process.env.ORDERS_ARCHIVE_AFTER_DAYS || 180));
   const ga = !!(s.ga4_id || s.meta_pixel_id);
-  const secs: Sec[] = kind === 'privacy' ? [
+  return kind === 'privacy' ? [
     ['Qui sommes-nous', [`${s.shop_name} exploite cette boutique en ligne. Pour toute question sur vos données : ${contact}.`]],
     ['Données collectées', ['Lors d\'une commande : votre nom, votre numéro de téléphone, votre adresse de livraison (si livraison) et une éventuelle note. Ces informations servent uniquement à préparer, livrer et confirmer votre commande, et à vous recontacter à son sujet.', 'Nous ne vendons ni ne louons vos données. Elles sont hébergées chez nos prestataires techniques (base de données et stockage de la plateforme).']],
     ['Mesure d\'audience', ['Nous comptons les visites de manière anonyme, sans cookie et sans enregistrer votre adresse IP : seuls des totaux (visiteurs, pages vues, produits consultés) sont conservés.', ...(ga ? [`Cette boutique utilise aussi ${[s.ga4_id && 'Google Analytics', s.meta_pixel_id && 'le Pixel Meta (Facebook)'].filter(Boolean).join(' et ')} pour mesurer et améliorer ses publicités et son audience. Ces services peuvent déposer des cookies. Vous pouvez les refuser dans les réglages de votre navigateur ou activer « Ne pas suivre ».`] : [])]],
@@ -26,13 +27,21 @@ const page = async (kind: 'privacy' | 'terms') => {
     ['Retours et échanges', ['Si un article ne correspond pas à votre commande ou présente un défaut, contactez-nous dès la réception : nous cherchons avec vous une solution (échange ou remboursement) selon les conditions convenues lors de la vente.']],
     ['Contact', [`${s.shop_name} : ${contact}.`]],
   ];
+}
+/** Même texte au format de l'éditeur (## Titre puis paragraphes) : point de départ proposé à la boutique. */
+export const legalDefaultText = (kind: LegalKind, s: Record<string, string>) => legalSections(kind, s).map(([h, ps]) => `## ${h}\n${ps.join('\n\n')}`).join('\n\n');
+
+const page = async (kind: LegalKind) => {
+  const shop = await getShop(); if (!shop) return platformPage();
+  const s = shop.s, custom = (kind === 'privacy' ? s.page_privacy : s.page_terms).trim();
+  const secs: Sec[] = custom ? [] : legalSections(kind, s);
   const title = kind === 'privacy' ? 'Politique de confidentialité' : 'Conditions de vente';
   return htmlPage(shop, { title, description: `${title} de ${s.shop_name}.`, canonical: kind === 'privacy' ? '/confidentialite' : '/conditions', kind: 'o' }, (
     <Shell shop={shop}>
       <section className="page narrow">
         <h1>{title}</h1>
         <p className="muted">Dernière mise à jour : {new Date().toISOString().slice(0, 10)}</p>
-        {secs.map(([h, ps]) => <div key={h}><h2>{h}</h2>{ps.map((t, i) => <p key={i}>{t}</p>)}</div>)}
+        {custom ? <div className="prose" dangerouslySetInnerHTML={{ __html: renderRich(custom) }} /> : secs.map(([h, ps]) => <div key={h}><h2>{h}</h2>{ps.map((t, i) => <p key={i}>{t}</p>)}</div>)}
       </section>
     </Shell>));
 };

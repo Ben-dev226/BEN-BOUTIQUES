@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<html lang="fr"><head><meta charset="UTF-8"><link rel="icon" type="image/png" sizes="32x32" href="/icon/32"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>Super-admin</title>
 <style>
 @font-face{font-family:"Bricolage";src:url(/fonts/bricolage.woff2) format("woff2");font-weight:200 800;font-display:swap}
@@ -118,6 +118,7 @@ const authBody=d=>({password:$('#mpw',d).value,code:$('#mcode',d)?.value||''});
 function edit(t){
  const d=modal(`<h2 style="margin-top:0">${esc(t.name)} <small>(${esc(t.slug)})</small></h2><form id="ef">
  <label>Nom<input name="name" value="${esc(t.name)}" required></label>
+ <label>Adresse courte<input name="slug" value="${esc(t.slug)}" pattern="[a-z0-9][a-z0-9-]{1,28}[a-z0-9]" required></label><small class="mut">Adresse de la boutique : /adresse/ (ou adresse.votredomaine). Les images déjà envoyées sont déplacées automatiquement. L’ancienne adresse cesse de fonctionner.</small>
  <div class="g2"><div><label>Offre<input name="plan" value="${esc(t.plan)}" list="plans"></label><datalist id="plans"><option>free</option><option>starter</option><option>pro</option></datalist></div><div><label>Abonnement payé jusqu’au<input name="paid_until" type="date" value="${esc(t.paid_until||'')}"></label></div></div>
  <div class="row" style="margin-top:.4rem"><button type="button" class="btn s" data-m="1">+1 mois</button><button type="button" class="btn s" data-m="3">+3 mois</button><button type="button" class="btn s" data-m="12">+1 an</button><button type="button" class="btn s" data-m="0">Sans échéance</button></div>
  <small class="mut">Date dépassée = boutique automatiquement indisponible. Vide = jamais d’expiration.</small>

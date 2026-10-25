@@ -22,10 +22,12 @@ export const clientSettings = (s: Settings) => { const p = publicSettings(s); re
 
 export async function queryProducts(shop: Shop, params: Record<string, string>, size: number, sort: string) {
   const { where, q } = productFilters(shop.tenant.id, params, false, Number(shop.s.low_stock_threshold));
-  const total = (await val<number>(`SELECT COUNT(*)::int FROM products p LEFT JOIN categories c ON c.id = p.category_id${where}`, q.params)) ?? 0;
+  const countParams = [...q.params];
   const lim = q.add(size);
-  const r = await rows(`${PRODUCT_SELECT}${where} ORDER BY ${productOrderSql(sort)} LIMIT ${lim}`, q.params);
-  return { products: r.map(x => formatProduct(x, shop.s)), total };
+  const [total, r] = await Promise.all([                       // les deux requêtes partent ensemble : un seul aller-retour
+    val<number>(`SELECT COUNT(*)::int FROM products p LEFT JOIN categories c ON c.id = p.category_id${where}`, countParams),
+    rows(`${PRODUCT_SELECT}${where} ORDER BY ${productOrderSql(sort)} LIMIT ${lim}`, q.params)]);
+  return { products: r.map(x => formatProduct(x, shop.s)), total: total ?? 0 };
 }
 
 export const plainText = (t: string) => t.replace(/\*\*?/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();

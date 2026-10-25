@@ -26,3 +26,13 @@ export async function processLogo(buf: Buffer, tenantSlug: string) {
   await putObject(path, out, 'image/webp');
   return { path };
 }
+
+/** Favicon d'une boutique : image carrée 512 px (PNG), recadrée au centre. */
+export async function processFavicon(buf: Buffer, tenantSlug: string) {
+  const meta = await sharp(buf, { limitInputPixels: 40_000_000 }).metadata().catch(() => null);
+  if (!meta || !['jpeg', 'png', 'webp'].includes(meta.format || '')) fail('Format non autorisé (JPG, PNG ou WebP uniquement)');
+  const out = await sharp(buf, { limitInputPixels: 40_000_000 }).rotate().resize(512, 512, { fit: 'cover', position: 'centre' }).png().toBuffer();
+  const path = `${tenantSlug}/brand/favicon-${randHex(6)}.png`;
+  await putObject(path, out, 'image/png');
+  return { path };
+}

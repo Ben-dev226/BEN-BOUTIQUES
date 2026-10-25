@@ -51,7 +51,7 @@ export default function Shell({ shop, nav = '', scripts = [], children }: { shop
           </div>
           <div>
             <h4>Boutique</h4>
-            <a href="/#catalogue">Catalogue</a><a href="/?new=1#catalogue">Nouveautés</a><a href="/?promo=1#catalogue">Promotions</a><a href="/suivi">Suivre ma commande</a>
+            <a href="/#catalogue">Catalogue</a><a href="/?new=1#catalogue">Nouveautés</a><a href="/?promo=1#catalogue">Promotions</a><a href="/suivi">Suivre ma commande</a>{s.page_faq.trim() && <a href="/faq">FAQ</a>}
           </div>
           <div>
             <h4>Contact</h4>

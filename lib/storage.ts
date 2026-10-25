@@ -50,3 +50,12 @@ export async function copyObject(from: string, to: string): Promise<void> {
   await fs.mkdir(path.dirname(path.join(root, to)), { recursive: true });
   await fs.copyFile(path.join(root, from), path.join(root, to));
 }
+
+/** Lit un objet stocké (clé « boutique/brand/x.png ») : fichier local ou téléchargement public. */
+export async function readObject(key: string): Promise<Buffer | null> {
+  try {
+    if (!key || key.includes('..')) return null;
+    if (driver() === 'supabase') { const r = await fetch(assetUrl(key)!); return r.ok ? Buffer.from(await r.arrayBuffer()) : null; }
+    return await fs.readFile(path.join(process.cwd(), 'public', 'uploads', key));
+  } catch { return null; }
+}

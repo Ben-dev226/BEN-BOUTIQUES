@@ -21,6 +21,9 @@ export function renderRich(t: string): string {
   let out = '', inList = false;
   for (const line of (t || '').trim().split(/\r?\n/)) {
     let e = esc(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(?<![*\w])\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, '<em>$1</em>');
+    e = e.replace(/\[([^\]]{1,120})\]\((https?:\/\/[^\s)"'<>]{1,300})\)/g, '<a href="$2" target="_blank" rel="noopener nofollow noreferrer">$1</a>');
+    const hd = e.match(/^\s*##\s+(.*)$/);
+    if (hd) { if (inList) { out += '</ul>'; inList = false; } out += `<h2>${hd[1]}</h2>`; continue; }
     const m = e.match(/^\s*[-•]\s+(.*)$/);
     if (m) { if (!inList) { out += '<ul>'; inList = true; } out += `<li>${m[1]}</li>`; }
     else { if (inList) { out += '</ul>'; inList = false; } if (e.trim()) out += `<p>${e}</p>`; }
@@ -41,4 +44,14 @@ export const isHex = (s: string) => /^#[0-9a-f]{6}$/i.test(s);
 /** Accepte uniquement une URL http(s) valide (refuse javascript:, data:, etc.) ; renvoie l'URL normalisée ou null. */
 export function safeHttpUrl(v: unknown): string | null {
   try { const u = new URL(String(v).trim()); return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null; } catch { return null; }
+}
+
+/** Découpe « ## Question » + réponse en paires. */
+export function parseFaq(t: string): { q: string; a: string }[] {
+  const out: { q: string; a: string }[] = []; let cur: { q: string; a: string } | null = null;
+  for (const line of (t || '').split(/\r?\n/)) {
+    const m = line.match(/^\s*##\s+(.*)$/);
+    if (m) { cur = { q: m[1].trim(), a: '' }; out.push(cur); } else if (cur) cur.a += line + '\n';
+  }
+  return out.map(x => ({ q: x.q, a: x.a.trim() })).filter(x => x.q && x.a);
 }

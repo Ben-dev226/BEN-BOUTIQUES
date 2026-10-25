@@ -45,6 +45,7 @@ const T: Record<string, Partial<Record<string, [Level, H]>>> = {
   'admin/customers': { GET: ['user', A.adminCustomers], PUT: ['user', A.adminCustomerUpdate] },
   'admin/customers/export': { GET: ['user', A.adminCustomersExport] },
   'admin/promos': { GET: ['user', A.adminPromos], POST: ['admin', c => A.adminPromoSave(c, false)], PUT: ['admin', c => A.adminPromoSave(c, true)], DELETE: ['admin', A.adminPromoDelete] },
+  'admin/pages': { GET: ['admin', A.adminPagesGet], POST: ['admin', A.adminPageSave], PUT: ['admin', A.adminPageSave] },
   'admin/settings': { GET: ['admin', A.adminSettingsGet], POST: ['admin', A.adminSettingsSave], PUT: ['admin', A.adminSettingsSave] },
   'admin/users': { GET: ['admin', A.adminUsers], POST: ['admin', c => A.adminUserSave(c, false)], PUT: ['admin', c => A.adminUserSave(c, true)], DELETE: ['admin', A.adminUserDelete] },
   'admin/activity': { GET: ['admin', A.adminActivity] },

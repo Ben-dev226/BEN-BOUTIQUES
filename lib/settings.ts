@@ -7,7 +7,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   meta_description: 'Boutique en ligne – commandez en quelques clics, confirmation par WhatsApp, livraison rapide.',
   whatsapp: '', phone_display: '', email: '', address: '', hours: '', facebook: '', instagram: '', tiktok: '', announcement: '',
   currency: 'FCFA', delivery_fee: '0', free_delivery_min: '0', delivery_note: 'Frais de livraison confirmés par WhatsApp selon votre quartier.',
-  seo_title: '', google_verification: '', ga4_id: '', meta_pixel_id: '', pickup_enabled: '1', low_stock_threshold: '3', order_prefix: 'CMD', primary_color: '#D91B1B', logo_url: '',
+  seo_title: '', google_verification: '', ga4_id: '', meta_pixel_id: '', pickup_enabled: '1', low_stock_threshold: '3', order_prefix: 'CMD', primary_color: '#D91B1B', logo_url: '', favicon_url: '', page_faq: '', page_terms: '', page_privacy: '',
 };
 export const PUBLIC_SETTINGS = ['shop_name', 'tagline', 'hero_title', 'hero_text', 'about_text', 'meta_description', 'whatsapp', 'phone_display', 'email', 'address', 'hours',
   'facebook', 'instagram', 'tiktok', 'announcement', 'currency', 'delivery_fee', 'free_delivery_min', 'delivery_note', 'pickup_enabled', 'primary_color', 'logo_url', 'seo_title'];
@@ -15,12 +15,24 @@ export const LONG_SETTINGS = ['hero_text', 'about_text', 'meta_description', 'de
 
 export type Settings = Record<string, string>;
 
+const SCACHE = new Map<number, { s: Settings; exp: number }>();
+export const forgetSettings = (tenantId?: number) => { if (tenantId === undefined) SCACHE.clear(); else SCACHE.delete(tenantId); };
+/** Réglages d'une boutique. Hors transaction : mis en cache 10 s par instance (la vitrine les lit à chaque page). */
 export async function loadSettings(tenantId: number, t?: Db): Promise<Settings> {
+  if (!t) { const hit = SCACHE.get(tenantId); if (hit && hit.exp > Date.now()) return { ...hit.s }; }
   const s = { ...SETTING_DEFAULTS };
   for (const r of await rows<{ k: string; v: string }>('SELECT k, v FROM settings WHERE tenant_id = $1', [tenantId], t)) if (r.k in s) s[r.k] = r.v;
-  return s;
+  if (!t) SCACHE.set(tenantId, { s, exp: Date.now() + 10_000 });
+  return { ...s };
 }
 export const publicSettings = (s: Settings): Settings => Object.fromEntries(PUBLIC_SETTINGS.map(k => [k, s[k]]));
+/** Enregistre plusieurs réglages en UNE requête (au lieu d'un aller-retour par champ). */
+export async function saveSettings(tenantId: number, entries: [string, string][], t?: Db) {
+  if (!entries.length) return;
+  await exec('INSERT INTO settings (tenant_id, k, v) SELECT $1, k, v FROM unnest($2::text[], $3::text[]) AS x(k, v) ON CONFLICT (tenant_id, k) DO UPDATE SET v = excluded.v', [tenantId, entries.map(e => e[0]), entries.map(e => e[1])], t);
+  SCACHE.delete(tenantId);
+}
 export async function saveSetting(tenantId: number, k: string, v: string, t?: Db) {
   await exec('INSERT INTO settings (tenant_id, k, v) VALUES ($1,$2,$3) ON CONFLICT (tenant_id, k) DO UPDATE SET v = excluded.v', [tenantId, k, v], t);
+  SCACHE.delete(tenantId);
 }
