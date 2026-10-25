@@ -9,6 +9,7 @@ const CSP = [
 export default {
   serverExternalPackages: ['sharp', 'pg', '@electric-sql/pglite'],
   poweredByHeader: false,
+  compress: true,
   images: { unoptimized: true },
   async rewrites() {
     return [
@@ -21,6 +22,10 @@ export default {
   async headers() {
     return [
       { source: '/(.*)', headers: [{ key: 'X-Content-Type-Options', value: 'nosniff' }, { key: 'Content-Security-Policy', value: CSP }, { key: 'X-Frame-Options', value: 'SAMEORIGIN' }, { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }, { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }, { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' }] },
+      { source: '/fonts/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
+      { source: '/assets/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }] },
+      { source: '/landing/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }] },
+      { source: '/admin/:file(admin\\.css|admin\\.js|admin-views\\.js)', headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }] },
       { source: '/super/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }, { key: 'X-Frame-Options', value: 'DENY' }, { key: 'Cache-Control', value: 'no-store' }] },
       { source: '/admin/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }, { key: 'X-Frame-Options', value: 'DENY' }] },
     ];

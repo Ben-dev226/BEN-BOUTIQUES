@@ -15,13 +15,12 @@ const jsonScript = (o: unknown) => JSON.stringify(o).replace(/</g, '\\u003c');
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const shop = await getShop(); if (!shop) return platformPage();
   const h = await headers(), preview = req.nextUrl.searchParams.has('preview');
-  const user = await sessionUserFromCookieHeader(h.get('cookie'), shop.tenant);
+  const user = shop.priv ? await sessionUserFromCookieHeader(h.get('cookie'), shop.tenant) : null;
   const P: any = await loadProductDetail(shop.tenant.id, shop.s, { slug: decodeURIComponent((await params).slug) }, preview && !!user);
   if (!P) return htmlPage(shop, { title: 'Produit introuvable', noindex: true }, (
     <Shell shop={shop}><section className="page narrow center"><h1>Produit introuvable</h1><p>Ce produit n&apos;existe plus ou n&apos;est plus disponible.</p><a className="btn btn-red" href="/">Retour au catalogue</a></section></Shell>
   ), 404);
   const s = shop.s;
-  if (!user && !isBot(h.get('user-agent') || '')) await countView(shop.tenant.id, P.id);
   const hasVar = P.variants.length > 0;
   const absUrl = (u: string) => (u.startsWith('http') ? u : shop.origin + u);
   const plain = plainText(P.description || '');

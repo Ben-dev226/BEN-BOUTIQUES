@@ -18,10 +18,11 @@ export async function record(tid: number, ownHost: string, ip: string, ua: strin
   const t = String(b?.t || 'pv'); if (!METRICS.has(t)) return;
   const id = Math.max(0, Math.min(2_000_000_000, parseInt(b?.id, 10) || 0));
   if (t === 'pv') {
-    await bump(tid, 'pv');
-    if (b?.k === 'p' && id) await bump(tid, 'prod', String(id));
+    // compteurs indépendants : envoyés ensemble
+    await Promise.all([bump(tid, 'pv'),
+      b?.k === 'p' && id ? Promise.all([bump(tid, 'prod', String(id)), exec('UPDATE products SET views = views + 1 WHERE id = $1 AND tenant_id = $2', [id, tid])]) : null]);   // vues produit : comptées ici (la page est mise en cache)
     if (b?.u) {                                        // premier passage du jour pour ce navigateur
-      await bump(tid, 'uv'); await bump(tid, 'dev', b?.m ? 'mobile' : 'desktop');
+      await Promise.all([bump(tid, 'uv'), bump(tid, 'dev', b?.m ? 'mobile' : 'desktop')]);
       let src = label(sourceOf(String(b?.r || ''), ownHost)) || 'Direct';
       const known = await one('SELECT 1 FROM stats_daily WHERE tenant_id = $1 AND day = (now() AT TIME ZONE \'utc\')::date AND metric = \'src\' AND ref = $2', [tid, src]);
       if (!known && Number((await one<{ n: number }>('SELECT COUNT(*)::int AS n FROM stats_daily WHERE tenant_id = $1 AND day = (now() AT TIME ZONE \'utc\')::date AND metric = \'src\'', [tid]))?.n) >= 30) src = 'Autres';

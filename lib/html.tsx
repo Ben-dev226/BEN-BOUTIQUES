@@ -4,8 +4,9 @@ import type { Shop } from './shop';
 import { clientSettings } from './shop';
 import { esc, shade, isHex } from './util';
 import { assetUrl } from './storage';
+import { resolveLook, FONTS } from './themes';
 
-const VER = '20261016';
+const VER = '20261026';
 export type Meta = { title?: string; description?: string; canonical?: string; image?: string; noindex?: boolean; type?: string; jsonld?: unknown; kind?: string; pid?: number; notrack?: boolean };
 
 /**
@@ -20,7 +21,8 @@ export function htmlPage(shop: Shop | null, meta: Meta, body: ReactNode, status 
   const abs = (u: string) => (/^https?:\/\//.test(u) ? u : origin + u);
   const canonical = meta.canonical ? abs(meta.canonical) : '';
   const image = abs(meta.image ?? '/icon/512');
-  const color = shop && isHex(s!.primary_color) ? s!.primary_color : '#D91B1B';
+  const look = shop ? resolveLook(s!) : null;
+  const color = look ? look.primary : '#D91B1B';
   const boot = shop ? `window.FQ=${JSON.stringify({ base: (shop.base || '') + '/', settings: clientSettings(s!), v: VER }).replace(/</g, '\\u003c')};` : '';
   const head = [
     '<meta charset="UTF-8">',
@@ -36,9 +38,9 @@ export function htmlPage(shop: Shop | null, meta: Meta, body: ReactNode, status 
       `<link rel="manifest" href="${shop.base}/manifest.webmanifest">`, `<link rel="icon" type="image/png" sizes="32x32" href="${shop.base}/icon/32"><link rel="icon" type="image/png" sizes="192x192" href="${shop.base}/icon/192">`, `<link rel="apple-touch-icon" href="${shop.base}/icon/192">`].join('\n') : '',
     shop ? '' : '<link rel="icon" type="image/png" sizes="32x32" href="/icon/32"><link rel="apple-touch-icon" href="/icon/192">',
     '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
-    '<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">',
+    `<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?${look ? look.fontCss : FONTS.classic.css}&display=swap" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?${look ? look.fontCss : FONTS.classic.css}&display=swap" rel="stylesheet"></noscript>`,
     `<link rel="stylesheet" href="/assets/css/shop.css?v=${VER}">`,
-    `<style>:root{--red:${color};--red-d:${shade(color, 0.72)};--red-l:${shade(color, 1.18)}}</style>`,
+    look ? `<style>:root{${look.vars}}</style>` : '',
     (Array.isArray(meta.jsonld) ? meta.jsonld : meta.jsonld ? [meta.jsonld] : []).map(j => `<script type="application/ld+json">${JSON.stringify(j).replace(/</g, '\\u003c')}</script>`).join(''),
     boot ? `<script>${boot}</script>` : '',
     s?.ga4_id && /^G-[A-Z0-9]{6,14}$/.test(s.ga4_id) ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${s.ga4_id}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${s.ga4_id}');</script>` : '',
@@ -48,7 +50,7 @@ export function htmlPage(shop: Shop | null, meta: Meta, body: ReactNode, status 
   const pre = shop?.base || '';
   let inner = renderChild(body);
   if (pre) inner = inner.replace(/(\s(?:href|src|action)=")\/(?!\/|assets\/|fonts\/|_next\/)/g, `$1${pre}/`);
-  const html = `<!DOCTYPE html>\n<html lang="fr"${shop && !meta.notrack ? ` data-k="${esc(meta.kind || 'o')}"${meta.pid ? ` data-id="${meta.pid}"` : ''}` : ''}><head>\n${head}\n</head><body>${inner}</body></html>`;
-  return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+  const html = `<!DOCTYPE html>\n<html lang="fr"${look?.decor ? ` data-decor="${look.decor}"` : ''}${look?.presetId ? ` data-theme="${look.presetId}"` : ''}${shop && !meta.notrack ? ` data-k="${esc(meta.kind || 'o')}"${meta.pid ? ` data-id="${meta.pid}"` : ''}` : ''}><head>\n${head}\n</head><body>${inner}</body></html>`;
+  return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': shop && !shop.priv && status === 200 ? 'public, max-age=0, s-maxage=30, stale-while-revalidate=600' : 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 }
 export { assetUrl };

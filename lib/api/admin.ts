@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { db, rows, one, val, exec, Q, type Db } from '../db';
-import { Ctx, fail, audit, requireLogin, passwordProblem, BCRYPT_COST } from './ctx';
+import { Ctx, fail, audit, requireLogin, passwordProblem, BCRYPT_COST, forgetUsers } from './ctx';
 import { PRODUCT_SELECT, formatProduct, productImages, productVariants, productFilters, productOrderSql, uniqueSlug, ORDER_STATUSES, csvResponse } from '../catalog';
 import { listProducts } from './public';
 import { rateLimit } from './ctx';
@@ -11,6 +11,7 @@ import { toXlsx } from '../xlsx';
 import { toPdf, cellText } from '../pdf';
 import { shopInsights } from '../insights';
 import { legalDefaultText } from '../legal';
+import { PRESETS, PALETTES, FONTS, RADII, DEFAULT_LOOK, lookProblem, upcoming } from '../themes';
 import { SETTING_DEFAULTS, LONG_SETTINGS, loadSettings, saveSetting, saveSettings, type Settings } from '../settings';
 import { assetUrl, deleteObjects, copyObject } from '../storage';
 import { processProductImage, processLogo, processFavicon } from '../images';
@@ -67,28 +68,34 @@ export async function adminStats(ctx: Ctx) {
   const kpi = async (a: string, b?: string) => {
     const r: any = await one(`SELECT COUNT(*)::int AS orders, COALESCE(SUM(total),0)::int AS revenue,
       COALESCE(SUM(CASE WHEN payment_status='paid' THEN total ELSE 0 END),0)::int AS paid, COUNT(DISTINCT customer_phone)::int AS customers
-      FROM orders WHERE tenant_id = $1 AND status <> 'cancelled' AND created_at::date >= $2::date${b ? ' AND created_at::date < $3::date' : ''}`, b ? [tid, a, b] : [tid, a]);
+      FROM orders WHERE tenant_id = $1 AND status <> 'cancelled' AND created_at >= $2::date${b ? ' AND created_at < $3::date' : ''}`, b ? [tid, a, b] : [tid, a]);
     r.avg_basket = r.orders ? Math.floor(r.revenue / r.orders) : 0; return r;
   };
-  const cur = await kpi(from), prev = await kpi(prevFrom, from);
-  const m = new Map((await rows(`SELECT created_at::date::text AS d, COUNT(*)::int AS n, COALESCE(SUM(total),0)::int AS t FROM orders WHERE tenant_id = $1 AND status <> 'cancelled' AND created_at::date >= $2::date GROUP BY 1`, [tid, from])).map(r => [r.d, r]));
+  const st = await ctx.settings();
+  const { where, q } = productFilters(tid, { low_stock: '1' }, true, Number(st.low_stock_threshold));
+  // toutes les lectures partent ensemble : un seul aller-retour vers la base au lieu de onze
+  const [cur, prev, daily, statusRows, top, cats, pending, low, latest, counts] = await Promise.all([
+    kpi(from), kpi(prevFrom, from),
+    rows(`SELECT created_at::date::text AS d, COUNT(*)::int AS n, COALESCE(SUM(total),0)::int AS t FROM orders WHERE tenant_id = $1 AND status <> 'cancelled' AND created_at >= $2::date GROUP BY 1`, [tid, from]),
+    rows('SELECT status, COUNT(*)::int AS n FROM orders WHERE tenant_id = $1 GROUP BY status', [tid]),
+    rows(`SELECT oi.product_id, oi.name, SUM(oi.qty)::int AS qty, SUM(oi.qty * oi.unit_price)::int AS revenue, MAX(oi.image) AS image
+      FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.tenant_id = $1 AND o.status <> 'cancelled' AND o.created_at >= $2::date
+      GROUP BY oi.product_id, oi.name ORDER BY revenue DESC LIMIT 5`, [tid, from]),
+    rows(`SELECT COALESCE(c.name,'Sans catégorie') AS cname, SUM(oi.qty*oi.unit_price)::int AS revenue FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id LEFT JOIN categories c ON c.id = p.category_id
+      WHERE o.tenant_id = $1 AND o.status <> 'cancelled' AND o.created_at >= $2::date GROUP BY 1 ORDER BY revenue DESC LIMIT 6`, [tid, from]),
+    val<number>("SELECT COUNT(*)::int FROM orders WHERE tenant_id = $1 AND status IN ('new','confirmed')", [tid]),
+    rows(`${PRODUCT_SELECT}${where} ORDER BY p.stock ASC LIMIT 8`, q.params),
+    rows('SELECT id, number, customer_name, total, status, created_at FROM orders WHERE tenant_id = $1 ORDER BY id DESC LIMIT 6', [tid]),
+    one(`SELECT (SELECT COUNT(*)::int FROM products WHERE tenant_id = $1 AND status='active') AS active_products,
+      (SELECT COUNT(*)::int FROM products WHERE tenant_id = $1 AND status<>'active') AS inactive_products, (SELECT COUNT(*)::int FROM customers WHERE tenant_id = $1) AS customers`, [tid]),
+  ]);
+  const m = new Map(daily.map((r: any) => [r.d, r]));
   const start = new Date(from + 'T00:00:00Z');
-  const series = Array.from({ length: days }, (_, i) => { const d = dateStr(addDays(start, i)); return { date: d, orders: m.get(d)?.n ?? 0, revenue: m.get(d)?.t ?? 0 }; });
+  const series = Array.from({ length: days }, (_, i) => { const d = dateStr(addDays(start, i)); return { date: d, orders: (m.get(d) as any)?.n ?? 0, revenue: (m.get(d) as any)?.t ?? 0 }; });
   const byStatus: Record<string, number> = Object.fromEntries(Object.keys(ORDER_STATUSES).map(k => [k, 0]));
-  for (const r of await rows('SELECT status, COUNT(*)::int AS n FROM orders WHERE tenant_id = $1 GROUP BY status', [tid])) byStatus[r.status] = r.n;
-  const top = await rows(`SELECT oi.product_id, oi.name, SUM(oi.qty)::int AS qty, SUM(oi.qty * oi.unit_price)::int AS revenue, MAX(oi.image) AS image
-    FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.tenant_id = $1 AND o.status <> 'cancelled' AND o.created_at::date >= $2::date
-    GROUP BY oi.product_id, oi.name ORDER BY revenue DESC LIMIT 5`, [tid, from]);
-  const cats = await rows(`SELECT COALESCE(c.name,'Sans catégorie') AS cname, SUM(oi.qty*oi.unit_price)::int AS revenue FROM order_items oi
-    JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id LEFT JOIN categories c ON c.id = p.category_id
-    WHERE o.tenant_id = $1 AND o.status <> 'cancelled' AND o.created_at::date >= $2::date GROUP BY 1 ORDER BY revenue DESC LIMIT 6`, [tid, from]);
-  const s = await ctx.settings();
-  const pending = await val<number>("SELECT COUNT(*)::int FROM orders WHERE tenant_id = $1 AND status IN ('new','confirmed')", [tid]);
-  const { where, q } = productFilters(tid, { low_stock: '1' }, true, Number(s.low_stock_threshold));
-  const low = await rows(`${PRODUCT_SELECT}${where} ORDER BY p.stock ASC LIMIT 8`, q.params);
-  const latest = await rows('SELECT id, number, customer_name, total, status, created_at FROM orders WHERE tenant_id = $1 ORDER BY id DESC LIMIT 6', [tid]);
-  const counts = await one(`SELECT (SELECT COUNT(*)::int FROM products WHERE tenant_id = $1 AND status='active') AS active_products,
-    (SELECT COUNT(*)::int FROM products WHERE tenant_id = $1 AND status<>'active') AS inactive_products, (SELECT COUNT(*)::int FROM customers WHERE tenant_id = $1) AS customers`, [tid]);
+  for (const r of statusRows) byStatus[r.status] = r.n;
+  const s = st;
   return ctx.json({ days, current: cur, previous: prev, series, by_status: byStatus,
     top_products: top.map(r => ({ id: r.product_id, name: r.name, qty: r.qty, revenue: r.revenue, thumb: assetUrl(r.image ? thumbOf(r.image) : null) })),
     categories: cats.map(r => ({ name: r.cname, revenue: r.revenue })), pending_orders: pending, low_stock: low.map(r => formatProduct(r, s, true)), latest_orders: latest, counts,
@@ -369,6 +376,11 @@ export async function adminSettingsSave(ctx: Ctx) {
     if (k === 'pickup_enabled') v = v === '1' || v === 'true' ? '1' : '0';
     if (k === 'order_prefix') v = v.replace(/[^A-Za-z0-9]/g, '').toUpperCase() || 'CMD';
     if (k === 'primary_color' && !isHex(v)) fail('Couleur invalide (ex. #D91B1B)');
+    if ((k === 'color_dark' || k === 'color_bg') && v && !isHex(v)) fail('Couleur invalide (ex. #0E0E0E)');
+    if (k === 'font' && !FONTS[v]) fail('Police inconnue');
+    if (k === 'radius' && !RADII[v]) fail('Forme inconnue');
+    if (k === 'theme' && v && !PRESETS.some(p => p.id === v)) fail('Thème inconnu');
+    if ((k === 'theme_from' || k === 'theme_to') && v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) fail('Date invalide');
     if (['facebook', 'instagram', 'tiktok'].includes(k) && v && !safeHttpUrl(v)) fail('Lien invalide : saisissez une adresse complète commençant par https:// (ex. https://instagram.com/maboutique)');
     if (['facebook', 'instagram', 'tiktok'].includes(k) && v) v = safeHttpUrl(v)!;
     if (k === 'google_verification') { v = v.replace(/^.*content=["']?([\w-]+).*$/, '$1').trim(); if (v && !/^[\w-]{10,100}$/.test(v)) fail('Code Google invalide : collez uniquement le code de vérification'); }
@@ -377,6 +389,12 @@ export async function adminSettingsSave(ctx: Ctx) {
     if (k === 'email' && v && !/^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/.test(v)) fail('Email invalide');
     if (k in cur && cur[k] === v) continue;                      // inchangé : ni écriture ni ligne de journal
     batch.push([k, v]); changed.push(k);
+  }
+  if (batch.some(([k]) => ['primary_color', 'color_dark', 'color_bg', 'theme_from', 'theme_to'].includes(k))) {
+    const m: Settings = { ...cur, ...Object.fromEntries(batch) };
+    const own = { primary: isHex(m.primary_color) ? m.primary_color : DEFAULT_LOOK.primary, dark: isHex(m.color_dark) ? m.color_dark : DEFAULT_LOOK.dark, bg: isHex(m.color_bg) ? m.color_bg : DEFAULT_LOOK.bg };
+    const prob = lookProblem(own); if (prob) fail(prob);
+    if (m.theme_from && m.theme_to && m.theme_to < m.theme_from) fail('La date de fin du thème précède la date de début.');
   }
   await saveSettings(ctx.tenant.id, batch);
   if (b.remove_favicon) { const old = (await ctx.settings()).favicon_url; await saveSetting(ctx.tenant.id, 'favicon_url', ''); if (old) await deleteObjects([old]); changed.push('favicon'); }
@@ -394,7 +412,7 @@ export async function adminUserSave(ctx: Ctx, update: boolean) {
     if (id) {
       if (id === me.id && (!active || role !== 'admin')) fail('Vous ne pouvez pas retirer vos propres droits');
       const u = await one('SELECT username FROM users WHERE id = $1 AND tenant_id = $2', [id, tid], t); if (!u) fail('Utilisateur introuvable', 404);
-      await exec('UPDATE users SET name=$1, role=$2, active=$3 WHERE id=$4 AND tenant_id=$5', [name, role, active, id, tid], t);
+      await exec('UPDATE users SET name=$1, role=$2, active=$3 WHERE id=$4 AND tenant_id=$5', [name, role, active, id, tid], t); forgetUsers();
       if (b.password) { const pb = passwordProblem(String(b.password), u!.username); if (pb) fail(pb); await exec('UPDATE users SET password_hash=$1, must_change_password=TRUE WHERE id=$2', [await bcrypt.hash(String(b.password), BCRYPT_COST), id], t); }
     } else {
       const n = await val<number>('SELECT COUNT(*)::int FROM users WHERE tenant_id = $1', [tid], t) ?? 0;
@@ -476,4 +494,16 @@ export async function adminPageSave(ctx: Ctx) {
   }
   await audit(ctx, 'page_update', 'page', null, key);
   return ctx.json({ ok: true });
+}
+
+// ── Apparence : thèmes de saison, palettes, suggestions ──
+export async function adminThemeGet(ctx: Ctx) {
+  const s = await ctx.settings(), today = new Date().toISOString().slice(0, 10);
+  const pick = ['primary_color', 'color_dark', 'color_bg', 'font', 'radius', 'theme', 'theme_from', 'theme_to', 'announcement', 'shop_name', 'tagline'];
+  return ctx.json({
+    settings: Object.fromEntries(pick.map(k => [k, s[k]])), today, default_look: DEFAULT_LOOK,
+    presets: PRESETS, palettes: PALETTES, radii: Object.entries(RADII).map(([id, r]) => ({ id, label: r.label, r: r.r })),
+    fonts: Object.entries(FONTS).map(([id, f]) => ({ id, label: f.label, head: f.head, body: f.body, css: f.css })),
+    suggestions: upcoming(today).slice(0, 3),
+  });
 }

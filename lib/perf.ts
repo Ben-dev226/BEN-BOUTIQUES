@@ -55,10 +55,10 @@ export async function flush(force = false): Promise<void> {
   const items = [...acc]; acc.clear(); const h = hourOf();
   try {
     const d = await db();
-    for (const [k, a] of items) await d.query(`INSERT INTO perf_hourly (hour, key, n, errors, sum_ms, max_ms, b0, b1, b2, b3, b4, b5, b6) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    await Promise.all(items.map(([k, a]) => d.query(`INSERT INTO perf_hourly (hour, key, n, errors, sum_ms, max_ms, b0, b1, b2, b3, b4, b5, b6) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
       ON CONFLICT (hour, key) DO UPDATE SET n = perf_hourly.n + EXCLUDED.n, errors = perf_hourly.errors + EXCLUDED.errors, sum_ms = perf_hourly.sum_ms + EXCLUDED.sum_ms, max_ms = GREATEST(perf_hourly.max_ms, EXCLUDED.max_ms),
       b0 = perf_hourly.b0 + EXCLUDED.b0, b1 = perf_hourly.b1 + EXCLUDED.b1, b2 = perf_hourly.b2 + EXCLUDED.b2, b3 = perf_hourly.b3 + EXCLUDED.b3, b4 = perf_hourly.b4 + EXCLUDED.b4, b5 = perf_hourly.b5 + EXCLUDED.b5, b6 = perf_hourly.b6 + EXCLUDED.b6`,
-      [h, k, a.n, a.errors, a.sum, a.max, ...a.b]);
+      [h, k, a.n, a.errors, a.sum, a.max, ...a.b])));
     if (now - state.lastCheck > 5 * 60_000) { state.lastCheck = now; await checkAnomalies(h); }
   } catch { for (const [k, a] of items) { const x = acc.get(k); if (!x) acc.set(k, a); } }   // base indisponible : on garde en mémoire
 }

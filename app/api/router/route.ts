@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, after } from 'next/server';
 import { Ctx, ApiError, requireLogin, clientIp } from '@/lib/api/ctx';
 import { tenantFromHeaders } from '@/lib/tenant';
 import * as P from '@/lib/api/public';
@@ -45,6 +45,7 @@ const T: Record<string, Partial<Record<string, [Level, H]>>> = {
   'admin/customers': { GET: ['user', A.adminCustomers], PUT: ['user', A.adminCustomerUpdate] },
   'admin/customers/export': { GET: ['user', A.adminCustomersExport] },
   'admin/promos': { GET: ['user', A.adminPromos], POST: ['admin', c => A.adminPromoSave(c, false)], PUT: ['admin', c => A.adminPromoSave(c, true)], DELETE: ['admin', A.adminPromoDelete] },
+  'admin/theme': { GET: ['admin', A.adminThemeGet] },
   'admin/pages': { GET: ['admin', A.adminPagesGet], POST: ['admin', A.adminPageSave], PUT: ['admin', A.adminPageSave] },
   'admin/settings': { GET: ['admin', A.adminSettingsGet], POST: ['admin', A.adminSettingsSave], PUT: ['admin', A.adminSettingsSave] },
   'admin/users': { GET: ['admin', A.adminUsers], POST: ['admin', c => A.adminUserSave(c, false)], PUT: ['admin', c => A.adminUserSave(c, true)], DELETE: ['admin', A.adminUserDelete] },
@@ -87,7 +88,7 @@ async function handle(req: NextRequest): Promise<Response> {
   const res = await inner(req);
   observe(key, Date.now() - t0, res.status >= 500);
   if ([401, 403, 404, 429].includes(res.status)) noteBad(ip, res.status, r.slice(0, 40));
-  await flush();
+  after(() => flush());                                   // après l'envoi de la réponse : ne retarde plus la requête
   return res;
 }
 export { handle as GET, handle as POST, handle as PUT, handle as DELETE };

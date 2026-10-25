@@ -201,7 +201,7 @@ A.route(/^\/settings$/, async (view) => {
   const area = (k, label, hint = '', rows = 3) => `<label class="f">${label}${hint ? `<small>${hint}</small>` : ''}<textarea name="${k}" rows="${rows}">${esc(s[k])}</textarea></label>`;
   view.innerHTML = `<div class="page-head"><h1>Paramètres</h1></div><form id="sf" class="stack" style="max-width:820px">
     <div class="card stack"><h2>Boutique</h2><div class="grid2">${inp('shop_name', 'Nom de la boutique')}${inp('tagline', 'Slogan')}</div>${inp('hero_title', "Titre de la page d'accueil")}${area('hero_text', "Texte d'accueil")}${inp('seo_title', 'Titre pour Google', 'Facultatif, environ 60 caractères. Par défaut : nom + slogan')}${area('meta_description', 'Description pour Google', 'Environ 150 caractères', 2)}${inp('google_verification', 'Code Google Search Console', 'Facultatif : collez le code de la balise de vérification')}<div class="grid2">${inp('ga4_id', 'Google Analytics (ID)', 'Facultatif, ex. G-ABC123XYZ')}${inp('meta_pixel_id', 'Pixel Meta / Facebook (ID)', 'Facultatif, chiffres uniquement')}</div>${inp('announcement', 'Bandeau d\'annonce', 'Affiché tout en haut du site (vide = aucun). Ex. : −10 % avec le code BIENVENUE10')}</div>
-    <div class="card stack"><h2>Apparence</h2><div class="grid2"><label class="f">Couleur principale<small>Boutons, bandeau, accents</small><input name="primary_color" type="color" value="${esc(s.primary_color || '#D91B1B')}" style="height:44px;padding:2px"></label>
+    <div class="card stack"><h2>Apparence</h2><div class="grid2"><div class="f">Couleurs et thèmes<small>Couleurs, polices, thèmes de saison : <a href="#/appearance">menu Apparence</a></small></div>
       <div class="f">Logo<small>PNG/JPG/WebP – fond transparent conseillé</small><div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap"><img id="logoPrev" src="${esc(s.logo_url)}" alt="" style="max-height:44px;max-width:140px;${s.logo_url ? '' : 'display:none'}"><input type="file" id="logoFile" accept="image/*" style="max-width:220px"><button type="button" class="btn sm danger" id="logoRm" ${s.logo_url ? '' : 'hidden'}>Retirer</button></div></div></div>
       <div class="f">Favicon (icône de l’onglet et de l’écran d’accueil)<small>Image carrée conseillée, 512 × 512 px. Sans image, l’initiale de la boutique est utilisée.</small><div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap"><img id="favPrev" src="${esc(s.favicon_url)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover;${s.favicon_url ? '' : 'display:none'}"><input type="file" id="favFile" accept="image/*" style="max-width:220px"><button type="button" class="btn sm danger" id="favRm" ${s.favicon_url ? '' : 'hidden'}>Retirer</button></div></div></div>
     <div class="card stack"><h2>Contact & réseaux</h2><div class="grid2">${inp('whatsapp', 'Numéro WhatsApp des commandes', 'Format international sans +, ex. 22670123456', 'tel')}${inp('phone_display', 'Téléphone affiché (facultatif)')}${inp('email', 'Email', '', 'email')}${inp('hours', 'Horaires')}</div>${inp('address', 'Adresse')}<div class="grid2">${inp('facebook', 'Facebook (URL)')}${inp('instagram', 'Instagram (URL)')}${inp('tiktok', 'TikTok (URL)')}</div></div>
@@ -272,3 +272,76 @@ A.route(/^\/pages(?:\/(\w+))?$/, async (view, key) => {
   $('#pf').addEventListener('submit', e => { e.preventDefault(); save(new FormData(e.target).get('body')); });
   $('#pm').addEventListener('click', () => { if (!confirm('Remplacer le texte actuel par le modèle ?')) return; $('#pf textarea').value = cur.model; save(cur.model); });
 }, 'pages');
+
+// ── Apparence : couleurs, polices, thèmes de saison, aperçu, suggestions ──
+A.route(/^\/appearance$/, async view => {
+  const T = await api('admin/theme'), o = T.settings, st = { ...o };
+  const lum = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [.2126, .7152, .0722][i], 0); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+  const mixc = (a, b, t) => { const f = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }, A1 = f(a), B1 = f(b); return '#' + A1.map((v, i) => Math.round(v + (B1[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+  const own = () => ({ primary: st.primary_color || T.default_look.primary, dark: st.color_dark || T.default_look.dark, bg: st.color_bg || T.default_look.bg });
+  const shown = () => T.presets.find(p => p.id === st.theme) || own();
+  const dt = s => { const d = new Date(s + 'T00:00:00Z'); return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' }); };
+  view.innerHTML = `<style>
+    .ap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:1rem;align-items:start;max-width:1120px}@media(max-width:900px){.ap{grid-template-columns:1fr}}
+    .ap-sw{display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid #0002;vertical-align:middle}.ap-sw i{width:16px;height:16px;display:block}
+    .ap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.5rem}
+    .ap-opt{border:2px solid #0002;border-radius:10px;padding:.55rem .6rem;background:#fff;cursor:pointer;text-align:left;font:inherit}.ap-opt[aria-pressed=true]{border-color:#0D3B2C;box-shadow:0 0 0 2px #0D3B2C33}.ap-opt small{display:block;color:#666;margin-top:.2rem;font-size:.72rem;line-height:1.3}
+    .ap-sug{border-left:4px solid #F5C22E;background:#fffbe9}
+    .ap-pv{position:sticky;top:1rem;border:1px solid #0002;border-radius:12px;overflow:hidden;background:var(--paper)}
+    .ap-pv .h{background:var(--ink);color:var(--paper);padding:.7rem .9rem;font-weight:700}.ap-pv .a{background:var(--red);color:var(--on);font-size:.72rem;text-align:center;padding:.25rem}
+    .ap-pv .b{padding:.9rem}.ap-pv h4{margin:0 0 .3rem;font-size:1.05rem;color:var(--ink)}.ap-pv p{margin:0 0 .7rem;font-size:.8rem;color:var(--muted)}
+    .ap-pv .btn1{display:inline-block;background:var(--red);color:var(--on);padding:.4rem .8rem;border-radius:var(--r);font-weight:600;font-size:.8rem}
+    .ap-pv .c{display:flex;gap:.5rem;margin-top:.8rem}.ap-pv .c div{flex:1;background:var(--cream);border:1px solid var(--line);border-radius:var(--r);padding:.5rem;font-size:.75rem;color:var(--ink)}.ap-pv .c b{color:var(--red);display:block;margin-top:.2rem}
+    .ap-warn{font-size:.8rem;margin-top:.3rem}.ap-warn.bad{color:#b42318}.ap-warn.ok{color:#1a7f45}
+  </style>
+  <div class="page-head"><h1>Apparence</h1></div>
+  <div id="sug"></div>
+  <div class="ap"><form id="apf" class="stack">
+    <div class="card stack"><h2>Mes couleurs</h2>
+      <p class="muted small">Palettes prêtes à l’emploi, puis ajustez chaque couleur si besoin. Elles s’appliquent toute l’année, sauf pendant un thème de saison.</p>
+      <div class="ap-grid" id="pal">${T.palettes.map(p => `<button type="button" class="ap-opt" data-pal="${p.id}" aria-pressed="false"><span class="ap-sw"><i style="background:${p.primary}"></i><i style="background:${p.dark}"></i><i style="background:${p.bg}"></i></span> <b style="font-size:.85rem">${esc(p.label)}</b></button>`).join('')}</div>
+      <div class="grid2" style="grid-template-columns:repeat(3,1fr)">
+        <label class="f">Couleur principale<small>Boutons, prix, liens</small><input type="color" name="primary_color" style="height:44px;padding:2px"></label>
+        <label class="f">Couleur sombre<small>Bandeau, bas de page</small><input type="color" name="color_dark" style="height:44px;padding:2px"></label>
+        <label class="f">Fond<small>Arrière-plan des pages</small><input type="color" name="color_bg" style="height:44px;padding:2px"></label>
+      </div><div class="ap-warn" id="warn"></div>
+      <div class="grid2"><label class="f">Police<select name="font">${T.fonts.map(f => `<option value="${f.id}">${esc(f.label)}</option>`).join('')}</select></label>
+        <label class="f">Forme des boutons et cartes<select name="radius">${T.radii.map(r => `<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></label></div>
+    </div>
+    <div class="card stack"><h2>Thème de saison</h2>
+      <p class="muted small">Change les couleurs et ajoute un décor léger (neige, coeurs, croissants…). Indiquez des dates : il s’active et se désactive tout seul.</p>
+      <div class="ap-grid" id="th"><button type="button" class="ap-opt" data-th="" aria-pressed="false"><b style="font-size:.85rem">Aucun</b><small>Mes couleurs, toute l’année</small></button>
+        ${T.presets.map(p => `<button type="button" class="ap-opt" data-th="${p.id}" aria-pressed="false"><span class="ap-sw"><i style="background:${p.primary}"></i><i style="background:${p.dark}"></i><i style="background:${p.bg}"></i></span> <b style="font-size:.85rem">${esc(p.label)}</b><small>${esc(p.hint)}</small></button>`).join('')}</div>
+      <div class="grid2"><label class="f">Du<input type="date" name="theme_from"></label><label class="f">Au<input type="date" name="theme_to"></label></div>
+      <small class="muted">Sans dates, le thème reste actif jusqu’à ce que vous le retiriez. Les dates du Ramadan et des fêtes musulmanes sont approximatives : vérifiez-les chaque année.</small>
+    </div>
+    <div class="savebar"><button class="btn primary">Enregistrer l’apparence</button></div>
+  </form>
+  <aside class="ap-pv" id="pv"><div class="a">Bandeau d’annonce</div><div class="h" id="pvn"></div><div class="b"><h4>Titre de votre boutique</h4><p>Un aperçu des couleurs, du bouton et des cartes.</p><span class="btn1">Commander</span><div class="c"><div>Article<b>12 500 FCFA</b></div><div>Article<b>8 000 FCFA</b></div></div></div></aside></div>`;
+  const F = view.querySelector('#apf'), $f = n => F.elements[n];
+  const sync = () => {
+    $f('primary_color').value = st.primary_color || T.default_look.primary; $f('color_dark').value = st.color_dark || T.default_look.dark; $f('color_bg').value = st.color_bg || T.default_look.bg;
+    $f('font').value = st.font || 'classic'; $f('radius').value = st.radius || 'soft'; $f('theme_from').value = st.theme_from || ''; $f('theme_to').value = st.theme_to || '';
+    view.querySelectorAll('[data-th]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.th === (st.theme || ''))));
+    const w = own(); view.querySelectorAll('[data-pal]').forEach(b => { const p = T.palettes.find(x => x.id === b.dataset.pal); b.setAttribute('aria-pressed', String(p.primary.toLowerCase() === w.primary.toLowerCase() && p.dark.toLowerCase() === w.dark.toLowerCase() && p.bg.toLowerCase() === w.bg.toLowerCase())); });
+    const L = shown(), pv = view.querySelector('#pv'), r = T.radii.find(x => x.id === (st.radius || 'soft')).r;
+    pv.style.cssText = `--red:${L.primary};--ink:${L.dark};--paper:${L.bg};--cream:${mixc(L.bg, L.dark, .07)};--line:${mixc(L.bg, L.dark, .16)};--muted:${mixc(L.dark, L.bg, .4)};--r:${r};--on:${ratio('#ffffff', L.primary) >= 3 ? '#fff' : '#0E0E0E'}`;
+    view.querySelector('#pvn').textContent = o.shop_name || 'Ma boutique';
+    const wn = view.querySelector('#warn'), c = ratio(w.primary, w.bg), bad = lum(w.bg) < .45 ? 'Le fond doit rester clair.' : lum(w.dark) > .18 ? 'La couleur sombre doit rester foncée.' : c < 2.6 ? 'La couleur principale est trop proche du fond : les prix seraient peu lisibles.' : '';
+    wn.className = 'ap-warn ' + (bad ? 'bad' : 'ok'); wn.textContent = bad || `Lisibilité correcte (contraste ${c.toFixed(1)}:1).`;
+  };
+  view.querySelector('#pal').addEventListener('click', e => { const b = e.target.closest('[data-pal]'); if (!b) return; const p = T.palettes.find(x => x.id === b.dataset.pal); st.primary_color = p.primary; st.color_dark = p.dark; st.color_bg = p.bg; sync(); });
+  view.querySelector('#th').addEventListener('click', e => { const b = e.target.closest('[data-th]'); if (!b) return; st.theme = b.dataset.th; if (!st.theme) { st.theme_from = ''; st.theme_to = ''; } sync(); });
+  F.addEventListener('input', e => { const n = e.target.name; if (n) { st[n] = e.target.value; sync(); } });
+  sync();
+  const sug = view.querySelector('#sug');
+  sug.innerHTML = T.suggestions.map((x, i) => `<div class="card ap-sug" style="margin-bottom:.6rem;max-width:1120px"><div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b>${x.active ? esc(x.label) + ' : c’est maintenant' : esc(x.label) + ' dans ' + x.starts_in + ' jour' + (x.starts_in > 1 ? 's' : '')}</b><div class="muted small">Thème conseillé du ${dt(x.from)} au ${dt(x.to)}${x.approx ? ' (dates approximatives)' : ''}. Bandeau proposé : « ${esc(x.announcement)} »</div></div><button type="button" class="btn sm primary" data-sg="${i}">Appliquer</button></div></div>`).join('');
+  sug.addEventListener('click', async e => { const b = e.target.closest('[data-sg]'); if (!b) return; const x = T.suggestions[+b.dataset.sg];
+    const body = { theme: x.preset, theme_from: x.from, theme_to: x.to }; if (confirm('Remplacer aussi le bandeau d’annonce par la proposition ?\n\n' + x.announcement + '\n\n(Annuler = garder votre bandeau actuel)')) body.announcement = x.announcement;
+    try { await api('admin/settings', { method: 'PUT', body }); toast('Thème appliqué'); location.reload(); } catch (err) { fail(err); } });
+  F.addEventListener('submit', async e => { e.preventDefault(); const body = {};
+    for (const k of ['primary_color', 'color_dark', 'color_bg', 'font', 'radius', 'theme', 'theme_from', 'theme_to']) if ((st[k] || '') !== (o[k] || '')) body[k] = st[k] || '';
+    if (!Object.keys(body).length) return toast('Aucun changement à enregistrer');
+    try { const r = await api('admin/settings', { method: 'PUT', body }); Object.assign(o, body); Object.assign(A.shop, r.settings); toast('Apparence enregistrée'); } catch (x) { fail(x); } });
+}, 'appearance');

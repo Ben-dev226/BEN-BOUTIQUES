@@ -236,3 +236,11 @@ Super-admin → ligne de la boutique → **Modération**. Avant chaque action, u
 - **Favicon** : Paramètres, Apparence, « Favicon ». Sans image, l'initiale du nom sur la couleur principale est utilisée. La plateforme a le sien (landing, super-admin).
 - **Adresse courte** : modifiable dans le super-admin (Modifier). Les images déjà envoyées sont déplacées automatiquement.
 - **Vitesse** : choisissez la région des fonctions Vercel (Settings, Functions, Region) la plus proche de votre base Supabase, et utilisez l'adresse « pooler » de Supabase dans DATABASE_URL. La distance entre les deux est la première cause de lenteur.
+
+## 20. Apparence : couleurs, polices, thèmes de saison
+
+Menu **Apparence** de l'admin (administrateurs de la boutique) :
+- **Mes couleurs** : 7 palettes prêtes à l'emploi ou 3 couleurs libres (principale, sombre, fond), police (4 choix) et forme des boutons (3 choix). Le serveur refuse les combinaisons illisibles (fond sombre, couleur principale trop proche du fond).
+- **Thème de saison** : Noël, Nouvel An, Saint-Valentin, Ramadan, Tabaski et Aïd, Black Friday, Soldes, Rentrée, Fête des mères. Chacun apporte sa palette et un décor léger (neige, coeurs, croissants, confettis, fleurs) sans image ni script. Avec des dates, le thème s'active et s'éteint seul ; hors dates, la boutique reprend ses couleurs.
+- **Suggestions** : selon la date du jour, l'écran propose la prochaine occasion avec ses dates, et un bandeau d'annonce à reprendre. Dates du Ramadan, de l'Aïd et de la Tabaski approximatives (table 2027 à 2029 dans `lib/themes.ts`).
+- Aperçu en direct à droite. Ajouter un thème : une ligne dans `PRESETS` (`lib/themes.ts`).

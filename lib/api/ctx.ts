@@ -85,10 +85,17 @@ export class Ctx {
 }
 
 /** Authentification + CSRF + rôle. */
+/** Utilisateur connecté mémorisé 8 s par instance : l'admin enchaîne plusieurs appels API par écran. */
+const ULRU = new Map<string, { row: SessionUser & { password_hash: string }; exp: number }>();
+export const forgetUsers = () => ULRU.clear();
 export async function requireLogin(ctx: Ctx, role?: 'admin', allowPending = false) {
   const s = await verifySession(cookieFrom(ctx.req.headers.get('cookie')));
   if (!s || s.tid !== ctx.tenant.id) fail('Authentification requise', 401);
-  const row = await one<SessionUser & { password_hash: string }>('SELECT id, username, name, role, must_change_password, password_hash FROM users WHERE id = $1 AND tenant_id = $2 AND active', [s!.uid, ctx.tenant.id]);
+  const ck = s!.tid + ':' + s!.uid, hit = ULRU.get(ck);
+  const load = async () => { const r = await one<SessionUser & { password_hash: string }>('SELECT id, username, name, role, must_change_password, password_hash FROM users WHERE id = $1 AND tenant_id = $2 AND active', [s!.uid, ctx.tenant.id]);
+    if (r) { if (ULRU.size > 500) ULRU.clear(); ULRU.set(ck, { row: r, exp: Date.now() + 8_000 }); } else ULRU.delete(ck); return r; };
+  let row = hit && hit.exp > Date.now() ? hit.row : await load();
+  if (row && hit && (s!.pf !== pwFingerprint(row.password_hash) || row.must_change_password)) row = await load();   // empreinte différente (mot de passe changé ailleurs) : on relit la base avant de refuser
   if (!row || s!.pf !== pwFingerprint(row.password_hash)) fail('Authentification requise', 401);
   const { password_hash: _ph, ...u } = row!;
   if (ctx.method !== 'GET' && ctx.req.headers.get('x-csrf-token') !== s!.csrf) fail('Jeton de sécurité invalide, rechargez la page', 403);
@@ -106,7 +113,7 @@ export async function audit(ctx: Ctx, action: string, entity = '', id: string | 
 /** true = autorisé. */
 export async function rateLimit(key: string, max: number, windowSec: number, hit = true): Promise<boolean> {
   const now = Math.floor(Date.now() / 1000);
-  await exec('DELETE FROM rate_limits WHERE ts < $1', [now - 86400]);
+  if (Math.random() < 0.05) await exec('DELETE FROM rate_limits WHERE ts < $1', [now - 86400]);   // nettoyage occasionnel, pas à chaque appel
   const c = await val<number>('SELECT COUNT(*)::int FROM rate_limits WHERE k = $1 AND ts > $2', [key, now - windowSec]);
   if ((c ?? 0) >= max) return false;
   if (hit) await exec('INSERT INTO rate_limits (k, ts) VALUES ($1,$2)', [key, now]);

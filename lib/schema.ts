@@ -358,4 +358,9 @@ CREATE TABLE banlist (
 `
 INSERT INTO platform_state (k, v) SELECT 'shops_created', GREATEST((SELECT COUNT(*) FROM tenants), (SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM tenants_id_seq))::text ON CONFLICT (k) DO NOTHING;
 `,
+// ───────── 14 : index pour les tableaux de bord et listes de commandes (filtre par date sans conversion de colonne) ───
+`
+CREATE INDEX IF NOT EXISTS orders_tenant_date ON orders (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS orders_tenant_id ON orders (tenant_id, id DESC);
+`,
 ];

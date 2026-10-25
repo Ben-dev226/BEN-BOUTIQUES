@@ -1,11 +1,11 @@
 import { fcfa } from '@/lib/util';
 
 /** Doit rester aligné avec cardHTML() de public/assets/js/core.js. */
-export default function ProductCard({ p }: { p: any }) {
+export default function ProductCard({ p, eager = false }: { p: any; eager?: boolean }) {
   return (
     <article className="card" data-id={p.id} data-name={p.name} data-price={p.price} data-img={p.thumb ?? ''} data-slug={p.slug}>
       <a className="card-media" href={p.url}>
-        {p.thumb ? <img src={p.thumb} alt={p.name} loading="lazy" decoding="async" width={480} height={480} /> : <div className="ph">{p.name.slice(0, 1)}</div>}
+        {p.thumb ? <img src={p.thumb} alt={p.name} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : undefined} decoding="async" width={480} height={480} /> : <div className="ph">{p.name.slice(0, 1)}</div>}
         <span className="tags">
           {!p.in_stock ? <span className="tag tag-out">Épuisé</span> : <>
             {p.is_new && <span className="tag">Nouveau</span>}

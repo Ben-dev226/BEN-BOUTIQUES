@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { db, rows, one, val, exec, type Db } from '../db';
-import { Ctx, fail, rateLimit, requireLogin, signSession, sessionCookie, clearCookie, passwordProblem, audit, verifySession, cookieFrom, pwFingerprint, trackKey, BCRYPT_COST, dummyHash } from './ctx';
+import { Ctx, fail, rateLimit, requireLogin, signSession, sessionCookie, clearCookie, passwordProblem, audit, verifySession, cookieFrom, pwFingerprint, trackKey, BCRYPT_COST, dummyHash, forgetUsers } from './ctx';
 import { PRODUCT_SELECT, formatProduct, productImages, productVariants, productFilters, productOrderSql, evaluatePromo, deliveryFeeFor, generateOrderNumber,
   orderWhatsappMessage, orderEvent, applyOrderStock, ORDER_STATUSES, originOf } from '../catalog';
 import { publicSettings } from '../settings';
@@ -197,7 +197,7 @@ export async function apiChangePassword(ctx: Ctx) {
   const pb = passwordProblem(nw, u.username); if (pb) fail(pb);
   if (nw === b.current) fail('Le nouveau mot de passe doit être différent');
   const newHash = await bcrypt.hash(nw, BCRYPT_COST);
-  await exec('UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE id = $2', [newHash, u.id]);
+  await exec('UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE id = $2', [newHash, u.id]); forgetUsers();
   // toutes les autres sessions de cet utilisateur sont invalidées ; celle-ci est renouvelée
   ctx.headersOut.append('Set-Cookie', sessionCookie(await signSession({ uid: u.id, tid: ctx.tenant.id, csrf: u.csrf, pf: pwFingerprint(newHash) }), ctx.https, ctx.base));
   await audit(ctx, 'password_change', 'user', u.id);

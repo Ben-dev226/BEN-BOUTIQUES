@@ -78,7 +78,7 @@ async function navigate() {
 const NAV = [
   ['dashboard', '', 'Tableau de bord'], ['audience', '', 'Audience'], ['reports', '', 'Rapports'], ['orders', '', 'Commandes'], ['products', '', 'Produits'], ['categories', '', 'Catégories'],
   ['customers', '', 'Clients'], ['promos', '', 'Codes promo'], ['sep', '', 'Administration'],
-  ['pages', '', 'Pages', 1], ['settings', '', 'Paramètres', 1], ['users', '', 'Utilisateurs', 1], ['activity', '', 'Journal', 1],
+  ['appearance', '', 'Apparence', 1], ['pages', '', 'Pages', 1], ['settings', '', 'Paramètres', 1], ['users', '', 'Utilisateurs', 1], ['activity', '', 'Journal', 1],
 ];
 function buildShell() {
   $('#nav').innerHTML = NAV.filter(n => !n[3] || A.user.role === 'admin').map(n => n[0] === 'sep' && A.user.role !== 'admin' ? '' :

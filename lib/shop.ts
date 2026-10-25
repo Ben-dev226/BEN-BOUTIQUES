@@ -6,7 +6,7 @@ import { PRODUCT_SELECT, formatProduct, productFilters, productOrderSql } from '
 import { rows, val } from './db';
 import { assetUrl } from './storage';
 
-export type Shop = { tenant: Tenant; s: Settings; origin: string; base: string };
+export type Shop = { tenant: Tenant; s: Settings; origin: string; base: string; priv: boolean };
 
 /** Boutique correspondant au nom de domaine de la requête (null = domaine inconnu). */
 export const getShop = cache(async (): Promise<Shop | null> => {
@@ -15,7 +15,7 @@ export const getShop = cache(async (): Promise<Shop | null> => {
   if (!tenant || tenant.status !== 'active') return null;
   const host = (h.get('x-forwarded-host') || h.get('host') || '').split(',')[0].trim();
   const proto = (h.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https')).split(',')[0];
-  return { tenant, s: await loadSettings(tenant.id), origin: `${proto}://${host}${base}`, base };
+  return { tenant, s: await loadSettings(tenant.id), origin: `${proto}://${host}${base}`, base, priv: /(^|;\s*)fq_session=/.test(h.get('cookie') || '') };
 });
 
 export const clientSettings = (s: Settings) => { const p = publicSettings(s); return { ...p, logo_url: assetUrl(p.logo_url) ?? '' }; };

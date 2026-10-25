@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
         </div>
         <div className="result-line"><span id="count">{total} produit{total > 1 ? 's' : ''}</span><button className="btn-link" id="showWish" hidden>Voir mes favoris</button></div>
         <div className="grid" id="grid" aria-live="polite">
-          {products.map(p => <ProductCard key={p.id as number} p={p} />)}
+          {products.map((p, i) => <ProductCard key={p.id as number} p={p} eager={i < 4} />)}
           {!products.length && <div className="empty"><p>Aucun produit ne correspond à votre recherche.</p><button className="btn btn-red" id="emptyReset">Voir tout le catalogue</button></div>}
         </div>
         <div className="more" id="more"><button className="btn btn-ghost-dark" id="loadMore" hidden={total <= size}>Voir plus de produits</button></div>
