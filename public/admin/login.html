@@ -31,14 +31,15 @@ a{display:block;text-align:center;margin-top:1.3rem;font-size:.85rem;color:#5266
   <a href="/">← Retour à la boutique</a>
 </form>
 <script>
-const api = 'index.php';
-fetch('/api/index.php?r=auth/me', {credentials:'same-origin'}).then(r=>r.json()).then(d=>{ if(d.user) location.replace('/admin/'); });
-fetch('/api/index.php?r=settings').then(r=>r.json()).then(s=>{ const n=(s.shop_name||'').split(' '); const l=n.pop(); document.getElementById('brand').innerHTML=(n.join(' ')?n.join(' ').replace(/[<>&]/g,'')+' ':'')+'<span>'+l.replace(/[<>&]/g,'')+'</span>'; document.title='Connexion – '+s.shop_name; }).catch(()=>{});
+const PFX = (location.pathname.match(/^(.*?)\/admin(?:\/|$)/) || [, ''])[1];
+document.querySelector('form a').href = PFX + '/';
+fetch(PFX + '/api/index.php?r=auth/me', {credentials:'same-origin'}).then(r=>r.json()).then(d=>{ if(d.user) location.replace(PFX + '/admin/'); });
+fetch(PFX + '/api/index.php?r=settings').then(r=>r.json()).then(s=>{ const n=(s.shop_name||'').split(' '); const l=n.pop(); document.getElementById('brand').innerHTML=(n.join(' ')?n.join(' ').replace(/[<>&]/g,'')+' ':'')+'<span>'+l.replace(/[<>&]/g,'')+'</span>'; document.title='Connexion – '+s.shop_name; }).catch(()=>{});
 document.getElementById('f').addEventListener('submit', async e => {
   e.preventDefault(); const b=document.getElementById('btn'), er=document.getElementById('err'); b.disabled=true; er.hidden=true;
   try {
-    const r = await fetch('/api/index.php?r=auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});
-    const d = await r.json(); if(!r.ok) throw new Error(d.error||'Erreur'); location.replace('/admin/');
+    const r = await fetch(PFX + '/api/index.php?r=auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});
+    const d = await r.json(); if(!r.ok) throw new Error(d.error||'Erreur'); location.replace(PFX + '/admin/');
   } catch(x){ er.textContent=x.message; er.hidden=false; b.disabled=false; }
 });
 </script></body></html>

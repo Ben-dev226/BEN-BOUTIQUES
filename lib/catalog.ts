@@ -166,6 +166,6 @@ export function csvResponse(filename: string, header: string[], data: unknown[][
 
 export function originOf(ctx: Ctx): string {
   const h = ctx.req.headers; const host = (h.get('x-forwarded-host') || h.get('host') || ctx.url.host).split(',')[0].trim();
-  return `${ctx.https ? 'https' : 'http'}://${host}`;
+  return `${ctx.https ? 'https' : 'http'}://${host}${ctx.base}`;
 }
 export { val };

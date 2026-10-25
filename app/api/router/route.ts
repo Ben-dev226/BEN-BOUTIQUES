@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { Ctx, ApiError, requireLogin, clientIp } from '@/lib/api/ctx';
-import { hostFromHeaders, tenantForHost } from '@/lib/tenant';
+import { tenantFromHeaders } from '@/lib/tenant';
 import * as P from '@/lib/api/public';
 import * as A from '@/lib/api/admin';
 import * as O from '@/lib/api/orders';
@@ -56,7 +56,7 @@ const T: Record<string, Partial<Record<string, [Level, H]>>> = {
 async function inner(req: NextRequest): Promise<Response> {
   const json = (d: unknown, status: number) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' } });
   try {
-    const tenant = await tenantForHost(hostFromHeaders(req.headers));
+    const tenant = await tenantFromHeaders(req.headers);
     if (!tenant) return json({ error: 'Boutique introuvable' }, 404);
     if (tenant.status !== 'active') return json({ error: 'Cette boutique est temporairement suspendue.' }, 503);
     const ctx = new Ctx(req, tenant);

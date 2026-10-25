@@ -9,7 +9,7 @@ import { isBanned } from './moderation';
 export type SignupMode = 'off' | 'review' | 'auto';
 export const signupMode = (): SignupMode => { const m = (process.env.SIGNUP_MODE || 'review').toLowerCase(); return m === 'off' || m === 'auto' ? m : 'review'; };
 export const trialDays = () => Math.max(0, Number(process.env.TRIAL_DAYS ?? 7));
-const RESERVED = ['www', 'app', 'api', 'admin', 'super', 'mail', 'ftp', 'static', 'assets', 'cdn', 'dashboard', 'login', 'status', 'inscription'];
+const RESERVED = ["www", "app", "api", "admin", "super", "mail", "ftp", "static", "assets", "cdn", "dashboard", "login", "status", "inscription", "setup", "fonts", "landing", "conditions", "confidentialite", "p", "c", "suivi", "a-propos", "icon", "sitemap", "robots", "manifest"];
 const MAX_PENDING = 30;
 const clean = (s: unknown, n: number) => String(s ?? '').replace(/[\u0000-\u001F<>]/g, '').trim().slice(0, n);
 
@@ -52,7 +52,7 @@ export async function createFromRequest(r: { slug: string; name: string; whatsap
   const days = trialDays(), until = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
   const t = await createTenant({ slug: r.slug, name: r.name, adminUser: 'admin', adminPassword: '', adminPasswordHash: r.hash, whatsapp: r.whatsapp, plan: 'free', paidUntil: until, mustChange: false });
   const root = process.env.ROOT_DOMAIN;
-  return { id: t.id, url: root ? `https://${r.slug}.${root}` : `/?tenant=${r.slug}`, until };
+  return { id: t.id, url: root ? `https://${r.slug}.${root}` : `/${r.slug}/`, until };
 }
 
 export async function listRequests() { return rows("SELECT id, slug, name, whatsapp, email, status, created_at, decided_at, tenant_id FROM signup_requests ORDER BY (status = 'pending') DESC, id DESC LIMIT 100"); }

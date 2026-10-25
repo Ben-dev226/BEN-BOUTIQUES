@@ -13,7 +13,7 @@ export async function GET() {
 <h2>Votre compte super-admin</h2><label>Votre email<input name="email" type="email" required autocomplete="username"></label>
 <label>Mot de passe<input name="password" type="password" required minlength="12" autocomplete="new-password"><small>12 caractères minimum, avec lettres et chiffres.</small></label>
 <h2>Votre première boutique (facultatif)</h2><label>Nom de la boutique<input name="shop_name" placeholder="FIFI QUALITY"></label>
-<label>Adresse courte<input name="slug" placeholder="fifi" autocapitalize="none"><small>Lettres, chiffres et tirets. Doit être égale à la variable DEFAULT_TENANT dans Vercel pour s'afficher à l'adresse principale.</small></label>
+<label>Adresse courte<input name="slug" placeholder="fifi" autocapitalize="none"><small>Lettres, chiffres et tirets. Votre boutique sera à l'adresse /adresse-courte (ex. ben-boutiques.vercel.app/fifi).</small></label>
 <label>Numéro WhatsApp des commandes<input name="whatsapp" type="tel" placeholder="22670123456"></label>
 <label>Mot de passe de la boutique<input name="shop_password" type="password" autocomplete="new-password"><small>8 caractères minimum. Identifiant de connexion de la boutique : admin.</small></label>
 <p id="err" role="alert"></p><button type="submit">Terminer la configuration</button></form><div id="ok" hidden></div>`,

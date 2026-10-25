@@ -1,14 +1,14 @@
 import { headers } from 'next/headers';
-import { tenantForHost, hostFromHeaders } from '@/lib/tenant';
+import { tenantFromHeaders, hostFromHeaders, baseFromHeaders } from '@/lib/tenant';
 import { htmlPage } from '@/lib/html';
 import { one } from '@/lib/db';
 import { landingPage } from './Landing';
 
 /** Boutique inconnue (racine de la plateforme, adresse erronée) ou suspendue. */
 export async function platformPage(status = 404) {
-  const host = hostFromHeaders(await headers()), root = (process.env.ROOT_DOMAIN || '').toLowerCase();
-  const t = await tenantForHost(host).catch(() => null);
-  if (!t && (!root || host === root || host === 'www.' + root)) return landingPage(host);
+  const hs = await headers(), host = hostFromHeaders(hs), root = (process.env.ROOT_DOMAIN || '').toLowerCase();
+  const t = await tenantFromHeaders(hs).catch(() => null);
+  if (!t && !baseFromHeaders(hs) && (!root || host === root || host === 'www.' + root)) return landingPage(host);
   const suspended = t?.status === 'suspended';
   let empty = false; try { empty = !t && !(await one('SELECT 1 FROM tenants LIMIT 1')); } catch { /* base injoignable */ }
   return htmlPage(null, { title: suspended ? 'Boutique indisponible' : process.env.PLATFORM_NAME || 'Boutiques en ligne' },

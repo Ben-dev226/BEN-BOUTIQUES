@@ -3,7 +3,7 @@
   var d = document.documentElement, ua = navigator.userAgent;
   window.FQ = window.FQ || {};
   var on = d.dataset.k && navigator.doNotTrack !== '1' && !/bot|crawl|spider|headless/i.test(ua);
-  function send(o) { if (!on) return; try { var s = JSON.stringify(o); if (!(navigator.sendBeacon && navigator.sendBeacon('/api/t', new Blob([s], { type: 'text/plain' })))) fetch('/api/t', { method: 'POST', body: s, keepalive: true, headers: { 'Content-Type': 'text/plain' } }); } catch (e) {} }
+  function send(o) { if (!on) return; try { var s = JSON.stringify(o); if (!(navigator.sendBeacon && navigator.sendBeacon(((window.FQ&&FQ.base)||'/')+'api/t', new Blob([s], { type: 'text/plain' })))) fetch(((window.FQ&&FQ.base)||'/')+'api/t', { method: 'POST', body: s, keepalive: true, headers: { 'Content-Type': 'text/plain' } }); } catch (e) {} }
   var GA = { cart: ['add_to_cart', 'AddToCart'], checkout: ['begin_checkout', 'InitiateCheckout'], order: ['purchase', 'Purchase'] };
   FQ.track = function (t, id, extra) {
     var g = GA[t];

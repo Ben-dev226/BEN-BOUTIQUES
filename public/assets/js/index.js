@@ -25,11 +25,11 @@ function cardHTML(p) {
   let tags = '';
   if (!p.in_stock) tags = '<span class="tag tag-out">Épuisé</span>';
   else { if (p.is_new) tags += '<span class="tag">Nouveau</span>'; if (p.discount_pct) tags += `<span class="tag tag-sale">-${p.discount_pct}%</span>`; else if (p.low_stock) tags += `<span class="tag tag-warn">Plus que ${p.stock_qty}</span>`; }
-  const act = p.has_variants ? `<a class="quick" href="${esc(p.url)}" aria-label="Choisir les options">⋯</a>` : (p.in_stock ? `<button class="quick" data-add="${p.id}" aria-label="Ajouter au panier">+</button>` : '');
+  const act = p.has_variants ? `<a class="quick" href="${esc(window.FQ.base.replace(/\/$/, '') + p.url)}" aria-label="Choisir les options">⋯</a>` : (p.in_stock ? `<button class="quick" data-add="${p.id}" aria-label="Ajouter au panier">+</button>` : '');
   return `<article class="card" data-id="${p.id}" data-name="${esc(p.name)}" data-price="${p.price}" data-img="${esc(p.thumb || '')}" data-slug="${esc(p.slug)}">
-    <a class="card-media" href="${esc(p.url)}">${img}<span class="tags">${tags}</span></a>
+    <a class="card-media" href="${esc(window.FQ.base.replace(/\/$/, '') + p.url)}">${img}<span class="tags">${tags}</span></a>
     <button class="heart" data-wish="${p.id}" aria-label="Ajouter aux favoris" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg></button>
-    <div class="card-body"><div class="cat">${esc(p.category_name || '')}</div><h3><a href="${esc(p.url)}">${esc(p.name)}</a></h3>
+    <div class="card-body"><div class="cat">${esc(p.category_name || '')}</div><h3><a href="${esc(window.FQ.base.replace(/\/$/, '') + p.url)}">${esc(p.name)}</a></h3>
     <div class="card-foot"><div class="prices"><span class="price">${fcfa(p.price)}</span>${p.compare_price ? `<s class="old">${fcfa(p.compare_price)}</s>` : ''}</div>${act}</div></div></article>`;
 }
 

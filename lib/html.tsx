@@ -21,7 +21,7 @@ export function htmlPage(shop: Shop | null, meta: Meta, body: ReactNode, status 
   const canonical = meta.canonical ? abs(meta.canonical) : '';
   const image = abs(meta.image ?? '/icon/512');
   const color = shop && isHex(s!.primary_color) ? s!.primary_color : '#D91B1B';
-  const boot = shop ? `window.FQ=${JSON.stringify({ base: '/', settings: clientSettings(s!), v: VER }).replace(/</g, '\\u003c')};` : '';
+  const boot = shop ? `window.FQ=${JSON.stringify({ base: (shop.base || '') + '/', settings: clientSettings(s!), v: VER }).replace(/</g, '\\u003c')};` : '';
   const head = [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
@@ -33,7 +33,7 @@ export function htmlPage(shop: Shop | null, meta: Meta, body: ReactNode, status 
     shop ? [`<meta property="og:site_name" content="${esc(shopName)}">`, `<meta property="og:type" content="${meta.type ?? 'website'}">`, `<meta property="og:title" content="${esc(title)}">`,
       `<meta property="og:description" content="${esc(desc)}">`, canonical ? `<meta property="og:url" content="${esc(canonical)}">` : '', `<meta property="og:image" content="${esc(image)}">`,
       '<meta property="og:locale" content="fr_FR">', '<meta name="twitter:card" content="summary_large_image">', `<meta name="twitter:title" content="${esc(title)}">`, `<meta name="twitter:description" content="${esc(desc)}">`, `<meta name="twitter:image" content="${esc(image)}">`, `<meta property="og:image:alt" content="${esc(meta.title || shopName)}">`, `<meta name="theme-color" content="${color}">`,
-      '<link rel="manifest" href="/manifest.webmanifest">', '<link rel="icon" type="image/png" sizes="192x192" href="/icon/192">', '<link rel="apple-touch-icon" href="/icon/192">'].join('\n') : '',
+      `<link rel="manifest" href="${shop.base}/manifest.webmanifest">`, `<link rel="icon" type="image/png" sizes="192x192" href="${shop.base}/icon/192">`, `<link rel="apple-touch-icon" href="${shop.base}/icon/192">`].join('\n') : '',
     '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
     '<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">',
     `<link rel="stylesheet" href="/assets/css/shop.css?v=${VER}">`,
@@ -44,7 +44,10 @@ export function htmlPage(shop: Shop | null, meta: Meta, body: ReactNode, status 
     s?.meta_pixel_id && /^\d{8,20}$/.test(s.meta_pixel_id) ? `<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${s.meta_pixel_id}');fbq('track','PageView');</script>` : '',
     shop ? `<script src="/assets/a.js?v=${VER}" defer></script>` : '',
   ].filter(Boolean).join('\n');
-  const html = `<!DOCTYPE html>\n<html lang="fr"${shop && !meta.notrack ? ` data-k="${esc(meta.kind || 'o')}"${meta.pid ? ` data-id="${meta.pid}"` : ''}` : ''}><head>\n${head}\n</head><body>${renderChild(body)}</body></html>`;
+  const pre = shop?.base || '';
+  let inner = renderChild(body);
+  if (pre) inner = inner.replace(/(\s(?:href|src|action)=")\/(?!\/|assets\/|fonts\/|_next\/)/g, `$1${pre}/`);
+  const html = `<!DOCTYPE html>\n<html lang="fr"${shop && !meta.notrack ? ` data-k="${esc(meta.kind || 'o')}"${meta.pid ? ` data-id="${meta.pid}"` : ''}` : ''}><head>\n${head}\n</head><body>${inner}</body></html>`;
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 }
 export { assetUrl };

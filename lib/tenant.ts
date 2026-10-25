@@ -22,11 +22,16 @@ export async function tenantBySlug(slug: string): Promise<Tenant | null> {
   return effective(await one<Tenant>(`SELECT ${COLS} FROM tenants WHERE slug = $1`, [slug]));
 }
 
-export async function tenantForHost(host: string): Promise<Tenant | null> {
-  const hit = cache.get(host);
+/** Préfixe de boutique (mode chemin, ex. « /fifi »), posé par le middleware ; chaîne vide sinon. */
+export const baseFromHeaders = (h: { get(k: string): string | null }) => { const b = h.get('x-shop-base') || ''; return /^\/[a-z0-9-]{2,40}$/.test(b) ? b : ''; };
+export const tenantFromHeaders = (h: { get(k: string): string | null }) => tenantForHost(hostFromHeaders(h), baseFromHeaders(h));
+
+export async function tenantForHost(host: string, base = ''): Promise<Tenant | null> {
+  const key = host + base;
+  const hit = cache.get(key);
   if (hit && hit.exp > Date.now()) return hit.t;
-  const t = await lookup(host);
-  cache.set(host, { t, exp: Date.now() + (t ? 20_000 : 5_000) });
+  const t = base ? effective(await tenantBySlug(base.slice(1))) : await lookup(host);
+  cache.set(key, { t, exp: Date.now() + (t ? 20_000 : 5_000) });
   return t;
 }
 export const forgetTenants = () => cache.clear();
@@ -41,13 +46,7 @@ async function lookup(host: string): Promise<Tenant | null> {
   if (root && host === root) return null;                  // page de la plateforme
   const custom = await one<Tenant>(`SELECT ${COLS} FROM tenants WHERE custom_domain = $1`, [host.replace(/^www\./, '')]);
   if (custom) return effective(custom);
-  const dev = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.vercel.app') || host.endsWith('.localhost');
-  if (dev || !root) {
-    if (process.env.DEFAULT_TENANT) return tenantBySlug(process.env.DEFAULT_TENANT);
-    const all = await one<{ n: number }>('SELECT COUNT(*)::int AS n FROM tenants');
-    if (all?.n === 1) return one<Tenant>(`SELECT ${COLS} FROM tenants LIMIT 1`).then(effective);
-  }
-  return null;
+  return null;                                             // *.vercel.app / localhost sans préfixe : la landing de la plateforme
 }
 
 /** Hôte du panneau super-admin : super.<ROOT_DOMAIN> (ou tout hôte de dev / aperçu). */

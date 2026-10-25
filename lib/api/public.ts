@@ -175,13 +175,13 @@ export async function apiLogin(ctx: Ctx) {
   const ok = await bcrypt.compare(password, u?.password_hash ?? dummyHash());
   if (!u || !ok) { await logWarn({ type: 'login_failed', tenantId: ctx.tenant.id, ip: ctx.ip, message: `Échec de connexion pour « ${username.slice(0, 40)} »` }); await rateLimit(kIp, 10, 900); await rateLimit(kU, 5, 900); await rateLimit(kG, 40, 900); fail('Identifiant ou mot de passe incorrect', 401); }
   const csrf = randHex(24);
-  ctx.headersOut.append('Set-Cookie', sessionCookie(await signSession({ uid: u!.id, tid: ctx.tenant.id, csrf, pf: pwFingerprint(u!.password_hash) }), ctx.https));
+  ctx.headersOut.append('Set-Cookie', sessionCookie(await signSession({ uid: u!.id, tid: ctx.tenant.id, csrf, pf: pwFingerprint(u!.password_hash) }), ctx.https, ctx.base));
   await exec('UPDATE users SET last_login_at = (now() AT TIME ZONE \'utc\') WHERE id = $1', [u!.id]);
   ctx.user = { id: u!.id, username: u!.username, name: u!.name, role: u!.role, must_change_password: u!.must_change_password, csrf };
   await audit(ctx, 'login', 'user', u!.id);
   return ctx.json({ id: u!.id, username: u!.username, name: u!.name, role: u!.role, must_change_password: u!.must_change_password, csrf });
 }
-export async function apiLogout(ctx: Ctx) { ctx.headersOut.append('Set-Cookie', clearCookie(ctx.https)); return ctx.json({ ok: true }); }
+export async function apiLogout(ctx: Ctx) { ctx.headersOut.append('Set-Cookie', clearCookie(ctx.https, ctx.base)); return ctx.json({ ok: true }); }
 export async function apiMe(ctx: Ctx) {
   const { sessionUserFromCookieHeader } = await import('./ctx');
   const u = await sessionUserFromCookieHeader(ctx.req.headers.get('cookie'), ctx.tenant);
@@ -199,7 +199,7 @@ export async function apiChangePassword(ctx: Ctx) {
   const newHash = await bcrypt.hash(nw, BCRYPT_COST);
   await exec('UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE id = $2', [newHash, u.id]);
   // toutes les autres sessions de cet utilisateur sont invalidées ; celle-ci est renouvelée
-  ctx.headersOut.append('Set-Cookie', sessionCookie(await signSession({ uid: u.id, tid: ctx.tenant.id, csrf: u.csrf, pf: pwFingerprint(newHash) }), ctx.https));
+  ctx.headersOut.append('Set-Cookie', sessionCookie(await signSession({ uid: u.id, tid: ctx.tenant.id, csrf: u.csrf, pf: pwFingerprint(newHash) }), ctx.https, ctx.base));
   await audit(ctx, 'password_change', 'user', u.id);
   return ctx.json({ ok: true });
 }

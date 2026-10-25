@@ -12,7 +12,7 @@ export async function GET() {
   const xml = (b: string) => new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${b}\n</urlset>`, { headers: { 'Content-Type': 'application/xml; charset=UTF-8', 'Cache-Control': 'public, max-age=3600' } });
   if (!shop) {
     if (!isPlatformRoot(hostFromHeaders(await headers()))) return new Response('Not found', { status: 404 });
-    return xml(`<url><loc>${esc(platformOrigin())}/</loc><priority>1.0</priority></url><url><loc>${esc(platformOrigin())}/inscription</loc><priority>0.8</priority></url>`);
+    return xml(`<url><loc>${esc(platformOrigin(hostFromHeaders(await headers())))}/</loc><priority>1.0</priority></url><url><loc>${esc(platformOrigin(hostFromHeaders(await headers())))}/inscription</loc><priority>0.8</priority></url>`);
   }
   const o = shop.origin, tid = shop.tenant.id;
   const u = (loc: string, mod?: string, pri = '0.6') => `<url><loc>${esc(loc)}</loc>${mod ? `<lastmod>${esc(mod.slice(0, 10))}</lastmod>` : ''}<priority>${pri}</priority></url>`;

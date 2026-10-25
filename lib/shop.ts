@@ -1,21 +1,21 @@
 import { cache } from 'react';
 import { headers } from 'next/headers';
-import { tenantForHost, hostFromHeaders, type Tenant } from './tenant';
+import { tenantFromHeaders, baseFromHeaders, type Tenant } from './tenant';
 import { loadSettings, publicSettings, type Settings } from './settings';
 import { PRODUCT_SELECT, formatProduct, productFilters, productOrderSql } from './catalog';
 import { rows, val } from './db';
 import { assetUrl } from './storage';
 
-export type Shop = { tenant: Tenant; s: Settings; origin: string };
+export type Shop = { tenant: Tenant; s: Settings; origin: string; base: string };
 
 /** Boutique correspondant au nom de domaine de la requête (null = domaine inconnu). */
 export const getShop = cache(async (): Promise<Shop | null> => {
   const h = await headers();
-  const tenant = await tenantForHost(hostFromHeaders(h));
+  const tenant = await tenantFromHeaders(h), base = baseFromHeaders(h);
   if (!tenant || tenant.status !== 'active') return null;
   const host = (h.get('x-forwarded-host') || h.get('host') || '').split(',')[0].trim();
   const proto = (h.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https')).split(',')[0];
-  return { tenant, s: await loadSettings(tenant.id), origin: `${proto}://${host}` };
+  return { tenant, s: await loadSettings(tenant.id), origin: `${proto}://${host}${base}`, base };
 });
 
 export const clientSettings = (s: Settings) => { const p = publicSettings(s); return { ...p, logo_url: assetUrl(p.logo_url) ?? '' }; };

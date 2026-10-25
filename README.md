@@ -23,7 +23,6 @@ C'est le chemin le plus court. Vous n'avez besoin ni d'un terminal ni d'un nom d
 | `SUPABASE_URL` | l'adresse du projet Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | la clé service_role |
 | `SUPABASE_BUCKET` | `uploads` |
-| `DEFAULT_TENANT` | `fifi` (l'adresse courte de votre boutique, voir étape 4) |
 | `SUPER_ALLOW_VERCEL_APP` | `1` |
 | `SETUP_TOKEN` | un code secret de votre choix, 12 caractères minimum (sert une seule fois, étape 4) |
 | `PLATFORM_NAME` | le nom de votre plateforme |
@@ -60,7 +59,7 @@ cp .env.example .env.local      # remplissez DATABASE_URL, AUTH_SECRET (openssl 
 npm run db:migrate              # crée les tables
 npm run tenant:create -- --slug fifi --name "FIFI QUALITY" --whatsapp 22605847872
 npm run import:v2 -- --slug fifi        # importe les 31 produits + images (seed/fifi)
-npm run dev                     # http://localhost:3000  (DEFAULT_TENANT=fifi)
+npm run dev                     # http://localhost:3000  (boutique : /fifi/)
 ```
 Sans `DATABASE_URL`, une base locale embarquée (PGlite, dossier `.data/`) est utilisée : pratique pour tester.
 `tenant:create` affiche l'identifiant `admin` et un mot de passe temporaire (changement obligatoire à la 1re connexion).
@@ -68,7 +67,7 @@ Sans `DATABASE_URL`, une base locale embarquée (PGlite, dossier `.data/`) est u
 ## 3. Déploiement Vercel (méthode avancée, avec terminal et domaine)
 1. Poussez ce dossier sur GitHub, puis Vercel → *Add New Project* → importez le dépôt (Next.js détecté).
 2. *Environment Variables* : `DATABASE_URL`, `AUTH_SECRET`, `ROOT_DOMAIN=ben-dev.com`, `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET=uploads`, `PLATFORM_NAME`.
-   Pour tester sur l'URL `*.vercel.app` ajoutez aussi `DEFAULT_TENANT=fifi`.
+   Sans domaine (adresse `*.vercel.app`), chaque boutique est servie sous `/adresse-courte/` : vitrine `/fifi/`, gestion `/fifi/admin/`. La racine affiche la landing.
 3. Déployez. Puis depuis votre PC (avec `.env.local` pointant vers Supabase) lancez `tenant:create` et `import:v2` si pas déjà fait.
 
 ## 4. Domaine ben-dev.com (sous-domaines automatiques)

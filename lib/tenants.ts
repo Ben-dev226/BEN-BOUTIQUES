@@ -6,7 +6,7 @@ import { forgetTenants } from './tenant';
 
 /** Nombre maximum de boutiques créées sur la plateforme, SUPPRESSIONS COMPRISES (plafond « à vie »). */
 export const LIFETIME_MAX_SHOPS = Number(process.env.MAX_SHOPS_LIFETIME || 50);
-const RESERVED = ['www', 'app', 'api', 'admin', 'super', 'mail', 'ftp', 'static', 'assets', 'cdn', 'dashboard', 'login', 'status'];
+const RESERVED = ["www", "app", "api", "admin", "super", "mail", "ftp", "static", "assets", "cdn", "dashboard", "login", "status", "inscription", "setup", "fonts", "landing", "conditions", "confidentialite", "p", "c", "suivi", "a-propos", "icon", "sitemap", "robots", "manifest"];
 
 export async function shopsEverCreated(): Promise<number> {
   const r = await one<{ v: string }>("SELECT v FROM platform_state WHERE k = 'shops_created'");

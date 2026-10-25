@@ -42,8 +42,8 @@ export async function verifySession(token: string | undefined): Promise<{ uid: n
 export function cookieFrom(header: string | null, name = COOKIE): string | undefined {
   return header?.split(';').map(s => s.trim()).find(s => s.startsWith(name + '='))?.slice(name.length + 1);
 }
-export const sessionCookie = (token: string, secure: boolean) => `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${TTL}${secure ? '; Secure' : ''}`;
-export const clearCookie = (secure: boolean) => `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? '; Secure' : ''}`;
+export const sessionCookie = (token: string, secure: boolean, path = '/') => `${COOKIE}=${token}; Path=${path || '/'}; HttpOnly; SameSite=Strict; Max-Age=${TTL}${secure ? '; Secure' : ''}`;
+export const clearCookie = (secure: boolean, path = '/') => `${COOKIE}=; Path=${path || '/'}; HttpOnly; SameSite=Strict; Max-Age=0${secure ? '; Secure' : ''}`;
 
 /** Utilisateur connecté de cette boutique (pour les pages serveur : aperçu des produits masqués). */
 export async function sessionUserFromCookieHeader(cookieHeader: string | null, tenant: Tenant): Promise<(SessionUser & { csrf: string }) | null> {
@@ -74,6 +74,8 @@ export class Ctx {
     return this._body;
   }
   get ip(): string { return clientIp(this.req.headers); }
+  /** Préfixe de la boutique en mode chemin (« /fifi »), sinon « ». Sert au chemin du cookie et aux liens absolus. */
+  get base(): string { const b = this.req.headers.get('x-shop-base') || ''; return /^\/[a-z0-9-]{2,40}$/.test(b) ? b : ''; }
   get https(): boolean { return (this.req.headers.get('x-forwarded-proto') || this.url.protocol.replace(':', '')) === 'https'; }
   async settings(): Promise<Settings> { return this._settings ??= await loadSettings(this.tenant.id); }
   json(data: unknown, status = 200): Response {

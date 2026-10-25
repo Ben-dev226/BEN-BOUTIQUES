@@ -158,7 +158,7 @@ A.route(/^\/categories$/, async (view) => {
 
 // ══ Clients ═══════════════════════════════════════════════
 A.route(/^\/customers$/, async (view) => {
-  view.innerHTML = `<div class="page-head"><h1>Clients</h1><div class="grow"></div><a class="btn" href="/api/index.php?r=admin/customers/export">Exporter CSV</a></div><div class="toolbar"><input type="search" id="q" placeholder="Nom ou téléphone…"></div><div id="list"></div>`;
+  view.innerHTML = `<div class="page-head"><h1>Clients</h1><div class="grow"></div><a class="btn" href="${PFX}/api/index.php?r=admin/customers/export">Exporter CSV</a></div><div class="toolbar"><input type="search" id="q" placeholder="Nom ou téléphone…"></div><div id="list"></div>`;
   const load = async q => {
     const { customers } = await api('admin/customers', { params: { q } });
     $('#list').innerHTML = customers.length ? `<div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Téléphone</th><th>Commandes</th><th>Total dépensé</th><th>Dernière commande</th><th></th></tr></thead><tbody>${customers.map(c => `<tr><td><b>${esc(c.name)}</b>${c.notes ? `<div class="muted small">${esc(c.notes)}</div>` : ''}</td><td>${esc(c.phone)}</td><td>${c.orders}${c.orders > 2 ? ' ' + pill('active', 'Fidèle') : ''}</td><td class="nowrap">${fcfa(c.spent)}</td><td>${fmtD(c.last_order?.slice(0, 10))}</td>
@@ -208,7 +208,7 @@ A.route(/^\/settings$/, async (view) => {
     <div class="card stack"><h2>Commandes & stock</h2><div class="grid2">${inp('order_prefix', 'Préfixe des numéros de commande', 'Ex. FQ → FQ-261015-AB12')}${inp('low_stock_threshold', 'Alerte stock faible à partir de', 'unités', 'number', 'min=0')}</div></div>
     <div class="savebar"><button class="btn primary">Enregistrer les paramètres</button></div></form>
     <div class="card stack" id="bill" style="max-width:820px;margin-top:1rem"><h2>Abonnement</h2><p class="muted small">Chargement…</p></div>
-    <div class="card stack" style="max-width:820px;margin-top:1rem"><h2>Sauvegarde</h2><p class="muted small">Téléchargez une copie complète des données de votre boutique (produits, commandes, clients) au format JSON. Conservez-la en lieu sûr, idéalement chaque semaine. Les photos sont stockées séparément et en sécurité.</p><div><a class="btn" href="/api/index.php?r=admin/backup">Télécharger la sauvegarde</a></div></div>`;
+    <div class="card stack" style="max-width:820px;margin-top:1rem"><h2>Sauvegarde</h2><p class="muted small">Téléchargez une copie complète des données de votre boutique (produits, commandes, clients) au format JSON. Conservez-la en lieu sûr, idéalement chaque semaine. Les photos sont stockées séparément et en sécurité.</p><div><a class="btn" href="${PFX}/api/index.php?r=admin/backup">Télécharger la sauvegarde</a></div></div>`;
   api('admin/billing').then(b => {
     const st = !b.paid_until ? 'Sans échéance' : (b.expired ? `<b style="color:#c0392b">Expiré le ${esc(b.paid_until)}</b>` : `Actif jusqu’au <b>${esc(b.paid_until)}</b>`);
     $('#bill').innerHTML = `<h2>Abonnement</h2><p>Offre <b>${esc(b.plan)}</b> · ${st}</p>` + (b.can_pay && b.options.length ? `<form id="bf" class="stack"><div class="grid2"><label class="f">Prénom<input name="first_name" required></label><label class="f">Nom<input name="last_name" required></label></div>

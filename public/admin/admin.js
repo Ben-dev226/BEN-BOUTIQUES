@@ -1,5 +1,6 @@
 /* Admin – noyau : API, utilitaires, routeur, tableau de bord, commandes */
 'use strict';
+const PFX = (location.pathname.match(/^(.*?)\/admin(?:\/|$)/) || [, ''])[1];   // « /fifi » en mode chemin, « » sinon
 const A = window.A = { routes: [], user: null, csrf: '', shop: {}, cats: [] };
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -18,9 +19,9 @@ async function api(route, { method = 'GET', params = {}, body, form } = {}) {
   const headers = {};
   if (method !== 'GET') headers['X-CSRF-Token'] = A.csrf;
   if (body) headers['Content-Type'] = 'application/json';
-  const res = await fetch(`/api/index.php?${qs}`, { method, headers, body: form || (body ? JSON.stringify(body) : undefined), credentials: 'same-origin' });
+  const res = await fetch(`${PFX}/api/index.php?${qs}`, { method, headers, body: form || (body ? JSON.stringify(body) : undefined), credentials: 'same-origin' });
   let data = null; try { data = await res.json(); } catch {}
-  if (res.status === 401) { location.replace('/admin/login.html'); throw new Error('Session expirée'); }
+  if (res.status === 401) { location.replace(PFX + '/admin/login.html'); throw new Error('Session expirée'); }
   if (!res.ok) { const e = new Error(data?.error || 'Erreur réseau'); e.data = data; e.status = res.status; throw e; }
   return data;
 }
@@ -87,7 +88,7 @@ function buildShell() {
   $('#logo').innerHTML = `${esc(n.join(' '))} <span>${esc(l)}</span><small>Espace gestion</small>`;
   document.title = `Admin – ${A.shop.shop_name || ''}`;
   $('#menuBtn').onclick = () => { $('#side').classList.add('open'); const s = document.createElement('div'); s.className = 'scrim'; s.onclick = () => { $('#side').classList.remove('open'); s.remove(); }; document.body.appendChild(s); };
-  $('#outBtn').onclick = async () => { try { await api('auth/logout', { method: 'POST' }); } catch {} location.replace('/admin/login.html'); };
+  $('#outBtn').onclick = async () => { try { await api('auth/logout', { method: 'POST' }); } catch {} location.replace(PFX + '/admin/login.html'); };
   $('#pwBtn').onclick = () => passwordModal(false);
 }
 function passwordModal(forced) {
@@ -119,8 +120,8 @@ async function pollOrders() {
 
 (async function boot() {
   try {
-    const [me, shop] = await Promise.all([fetch('/api/index.php?r=auth/me', { credentials: 'same-origin' }).then(r => r.json()), fetch('/api/index.php?r=settings').then(r => r.json())]);
-    if (!me.user) return location.replace('/admin/login.html');
+    const [me, shop] = await Promise.all([fetch(PFX + '/api/index.php?r=auth/me', { credentials: 'same-origin' }).then(r => r.json()), fetch(PFX + '/api/index.php?r=settings').then(r => r.json())]);
+    if (!me.user) return location.replace(PFX + '/admin/login.html');
     Object.assign(A, { user: me.user, csrf: me.csrf, shop });
     $('#app').hidden = false; buildShell();
     if (me.user.must_change_password) return passwordModal(true);
@@ -198,7 +199,7 @@ A.route(/^\/reports$/, async (view) => {
     $('#rTitle').textContent = r.title;
     $('#rTable').innerHTML = `<thead><tr>${r.columns.map(c => `<th style="${c.type !== 'text' ? 'text-align:right' : ''}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${r.rows.map(row => `<tr>${row.map((v, i) => `<td style="${r.columns[i].type !== 'text' ? 'text-align:right;white-space:nowrap' : ''}">${cell(v, r.columns[i].type)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${r.columns.length || 1}" class="muted" style="padding:1.2rem">Aucune donnée sur cette période.</td></tr>`}${r.totals ? `<tr style="font-weight:700;background:var(--mint)">${r.totals.map((v, i) => `<td style="${r.columns[i].type !== 'text' ? 'text-align:right;white-space:nowrap' : ''}">${cell(v, r.columns[i].type)}</td>`).join('')}</tr>` : ''}</tbody>`;
     $('#rNote').textContent = r.total_rows > 200 ? `Aperçu : 200 lignes sur ${r.total_rows}. Les exports contiennent tout.` : `${r.total_rows} ligne${r.total_rows > 1 ? 's' : ''}`;
-    const link = f => `/api/index.php?${new URLSearchParams({ r: 'admin/report/export', format: f, c: q() })}`;
+    const link = f => `${PFX}/api/index.php?${new URLSearchParams({ r: 'admin/report/export', format: f, c: q() })}`;
     $('#xCsv').href = link('csv'); $('#xXlsx').href = link('xlsx'); $('#xPdf').href = link('pdf');
   };
   const refresh = (delay = 250) => { clearTimeout(timer); timer = setTimeout(() => load().catch(fail), delay); };
@@ -281,7 +282,7 @@ A.route(/^\/orders(?:\/(\d+))?(?:\?.*)?$/, async (view, openId) => {
     const d = await api('admin/orders', { params: { ...f, size: 20 } });
     $('#tabs').innerHTML = [['', 'Toutes', Object.values(d.status_counts).reduce((a, b) => a + b, 0)], ['open', 'En cours', d.status_counts.new + d.status_counts.confirmed + d.status_counts.shipped], ...Object.entries(STATUS).map(([k, l]) => [k, l, d.status_counts[k]])]
       .map(([k, l, n]) => `<button class="tab ${f.status === k ? 'on' : ''}" data-s="${k}">${l}<small>${n}</small></button>`).join('');
-    const qs = new URLSearchParams({ r: 'admin/orders/export', status: f.status, q: f.q, from: f.from, to: f.to, payment: f.payment }); $('#exp').href = `/api/index.php?${qs}`;
+    const qs = new URLSearchParams({ r: 'admin/orders/export', status: f.status, q: f.q, from: f.from, to: f.to, payment: f.payment }); $('#exp').href = `${PFX}/api/index.php?${qs}`;
     $('#list').innerHTML = d.orders.length ? `<div class="tbl-wrap"><table><thead><tr><th>N°</th><th>Date</th><th>Client</th><th>Articles</th><th>Total</th><th>Statut</th><th>Paiement</th></tr></thead><tbody>${d.orders.map(o => `<tr class="click" data-id="${o.id}"><td><b>${esc(o.number)}</b></td><td class="nowrap">${fmtDT(o.created_at)}</td><td>${esc(o.customer_name)}<div class="muted small">${esc(o.customer_phone)}</div></td><td>${o.items_count}</td><td class="nowrap"><b>${fcfa(o.total)}</b></td><td>${pill(o.status, o.status_label)}</td><td>${pill(o.payment_status, o.payment_status === 'paid' ? 'Payée' : 'À encaisser')}</td></tr>`).join('')}</tbody></table></div>${pager(d)}<p class="muted small">Total affiché hors annulées : <b>${fcfa(d.sum)}</b></p>` : '<div class="card empty">Aucune commande pour ces critères.</div>';
     $$('#list tr.click').forEach(r => r.addEventListener('click', () => location.hash = `#/orders/${r.dataset.id}`));
     bindPager($('#list'), p => { f.page = p; load().catch(fail); });
