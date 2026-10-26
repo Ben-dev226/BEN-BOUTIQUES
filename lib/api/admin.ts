@@ -11,6 +11,7 @@ import { toXlsx } from '../xlsx';
 import { toPdf, cellText } from '../pdf';
 import { shopInsights } from '../insights';
 import { legalDefaultText } from '../legal';
+import { TEMPLATES } from '../templates';
 import { PRESETS, PALETTES, FONTS, RADII, DEFAULT_LOOK, lookProblem, upcoming } from '../themes';
 import { SETTING_DEFAULTS, LONG_SETTINGS, loadSettings, saveSetting, saveSettings, type Settings } from '../settings';
 import { assetUrl, deleteObjects, copyObject } from '../storage';
@@ -377,6 +378,7 @@ export async function adminSettingsSave(ctx: Ctx) {
     if (k === 'order_prefix') v = v.replace(/[^A-Za-z0-9]/g, '').toUpperCase() || 'CMD';
     if (k === 'primary_color' && !isHex(v)) fail('Couleur invalide (ex. #D91B1B)');
     if ((k === 'color_dark' || k === 'color_bg') && v && !isHex(v)) fail('Couleur invalide (ex. #0E0E0E)');
+    if (k === 'template' && !TEMPLATES.some(t => t.id === v)) fail('Modèle inconnu');
     if (k === 'font' && !FONTS[v]) fail('Police inconnue');
     if (k === 'radius' && !RADII[v]) fail('Forme inconnue');
     if (k === 'theme' && v && !PRESETS.some(p => p.id === v)) fail('Thème inconnu');
@@ -499,10 +501,10 @@ export async function adminPageSave(ctx: Ctx) {
 // ── Apparence : thèmes de saison, palettes, suggestions ──
 export async function adminThemeGet(ctx: Ctx) {
   const s = await ctx.settings(), today = new Date().toISOString().slice(0, 10);
-  const pick = ['primary_color', 'color_dark', 'color_bg', 'font', 'radius', 'theme', 'theme_from', 'theme_to', 'announcement', 'shop_name', 'tagline'];
+  const pick = ['template', 'primary_color', 'color_dark', 'color_bg', 'font', 'radius', 'theme', 'theme_from', 'theme_to', 'announcement', 'shop_name', 'tagline'];
   return ctx.json({
     settings: Object.fromEntries(pick.map(k => [k, s[k]])), today, default_look: DEFAULT_LOOK,
-    presets: PRESETS, palettes: PALETTES, radii: Object.entries(RADII).map(([id, r]) => ({ id, label: r.label, r: r.r })),
+    templates: TEMPLATES, presets: PRESETS, palettes: PALETTES, radii: Object.entries(RADII).map(([id, r]) => ({ id, label: r.label, r: r.r })),
     fonts: Object.entries(FONTS).map(([id, f]) => ({ id, label: f.label, head: f.head, body: f.body, css: f.css })),
     suggestions: upcoming(today).slice(0, 3),
   });

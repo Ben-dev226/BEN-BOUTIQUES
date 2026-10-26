@@ -5,8 +5,9 @@ import { clientSettings } from './shop';
 import { esc, shade, isHex } from './util';
 import { assetUrl } from './storage';
 import { resolveLook, FONTS } from './themes';
+import { templateOf } from './templates';
 
-const VER = '20261027';
+const VER = '20261028';
 export type Meta = { title?: string; description?: string; canonical?: string; image?: string; noindex?: boolean; type?: string; jsonld?: unknown; kind?: string; pid?: number; notrack?: boolean };
 
 /**
@@ -50,7 +51,7 @@ export function htmlPage(shop: Shop | null, meta: Meta, body: ReactNode, status 
   const pre = shop?.base || '';
   let inner = renderChild(body);
   if (pre) inner = inner.replace(/(\s(?:href|src|action)=")\/(?!\/|assets\/|fonts\/|_next\/)/g, `$1${pre}/`);
-  const html = `<!DOCTYPE html>\n<html lang="fr"${look?.decor ? ` data-decor="${look.decor}"` : ''}${look?.presetId ? ` data-theme="${look.presetId}"` : ''}${shop && !meta.notrack ? ` data-k="${esc(meta.kind || 'o')}"${meta.pid ? ` data-id="${meta.pid}"` : ''}` : ''}><head>\n${head}\n</head><body>${inner}</body></html>`;
+  const html = `<!DOCTYPE html>\n<html lang="fr"${shop && templateOf(s!.template) !== 'classique' ? ` data-tpl="${templateOf(s!.template)}"` : ''}${look?.decor ? ` data-decor="${look.decor}"` : ''}${look?.presetId ? ` data-theme="${look.presetId}"` : ''}${shop && !meta.notrack ? ` data-k="${esc(meta.kind || 'o')}"${meta.pid ? ` data-id="${meta.pid}"` : ''}` : ''}><head>\n${head}\n</head><body>${inner}</body></html>`;
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': shop && !shop.priv && status === 200 ? 'public, max-age=0, s-maxage=30, stale-while-revalidate=600' : 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 }
 export { assetUrl };

@@ -6,6 +6,8 @@ import ProductCard from '@/components/ProductCard';
 import { getShop, queryProducts } from '@/lib/shop';
 import { rows } from '@/lib/db';
 import { normalizePhone } from '@/lib/util';
+import { templateOf } from '@/lib/templates';
+import { assetUrl } from '@/lib/storage';
 import { platformPage } from '@/components/PlatformHome';
 
 const SORTS = ['price_asc', 'price_desc', 'name', 'popular', 'discount'];
@@ -25,14 +27,29 @@ export async function GET(req: NextRequest) {
   const size = Number(process.env.PAGE_SIZE || 12);
   const [{ products, total }, cats] = await Promise.all([queryProducts(shop, q, size, sort), rows(`SELECT c.name, c.slug, (SELECT COUNT(*)::int FROM products p WHERE p.category_id = c.id AND p.status = 'active') AS n FROM categories c WHERE c.tenant_id = $1 ORDER BY c.position, lower(c.name)`, [shop.tenant.id])]);
   const filtered = Object.entries(q).some(([k, v]) => k !== 'sort' && v !== '');
-  const { s } = shop, wa = normalizePhone(s.whatsapp);
+  const { s } = shop, wa = normalizePhone(s.whatsapp), tpl = templateOf(s.template);
   const social = [s.facebook, s.instagram, s.tiktok].filter(Boolean);
   const ld = [{ '@context': 'https://schema.org', '@type': 'OnlineStore', '@id': shop.origin + '/#store', name: s.shop_name, url: shop.origin + '/', description: s.meta_description, image: shop.origin + '/icon/512', logo: shop.origin + '/icon/512',
     address: s.address ? { '@type': 'PostalAddress', streetAddress: s.address } : undefined, telephone: wa ? '+' + wa : undefined, email: s.email || undefined, openingHours: s.hours || undefined, currenciesAccepted: 'XOF', sameAs: social.length ? social : undefined },
     { '@context': 'https://schema.org', '@type': 'WebSite', name: s.shop_name, url: shop.origin + '/', potentialAction: { '@type': 'SearchAction', target: { '@type': 'EntryPoint', urlTemplate: shop.origin + '/?q={search_term_string}' }, 'query-input': 'required name=search_term_string' } }];
   const page = (
     <Shell shop={shop} nav="catalogue" scripts={['index.js']}>
-      {!filtered && (
+      {!filtered && tpl === 'catalogue' && (
+        <section className="strip"><div className="strip-in"><div><h1>{s.hero_title}</h1><p>{s.tagline}{s.hours ? ' · ' + s.hours : ''}</p></div>
+          {wa && <a className="btn btn-wa" href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}</div></section>
+      )}
+      {!filtered && tpl === 'mobile' && (
+        <section className="profile"><div className="profile-in">
+          <div className="avatar">{s.logo_url ? <img src={assetUrl(s.logo_url)!} alt="" /> : <span>{[...s.shop_name.trim()][0]?.toUpperCase() || 'B'}</span>}</div>
+          <h1>{s.shop_name}</h1><p>{s.tagline}</p>
+          <div className="profile-cta">
+            {wa && <a className="btn btn-wa btn-lg block" href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer">Commander sur WhatsApp</a>}
+            <a className="btn btn-ghost-dark block" href="#catalogue">Voir les produits</a>
+          </div>
+          {s.hero_text && <p className="profile-note">{s.hero_text}</p>}
+        </div></section>
+      )}
+      {!filtered && tpl !== 'catalogue' && tpl !== 'mobile' && (
         <section className="hero"><div className="hero-in">
           <span className="eyebrow">{s.tagline}</span>
           <h1>{s.hero_title}</h1><p>{s.hero_text}</p>

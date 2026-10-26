@@ -9,7 +9,7 @@ export const Brand = ({ name }: { name: string }) => {
   const last = p.pop();
   return <>{p.join(' ')}<span>{last}</span></>;
 };
-const V = '20261027';
+const V = '20261028';
 
 export default function Shell({ shop, nav = '', scripts = [], children }: { shop: Shop; nav?: string; scripts?: string[]; children: ReactNode }) {
   const { s } = shop, wa = normalizePhone(s.whatsapp), logo = s.logo_url ? assetUrl(s.logo_url) : null;

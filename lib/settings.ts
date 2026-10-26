@@ -7,7 +7,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   meta_description: 'Boutique en ligne – commandez en quelques clics, confirmation par WhatsApp, livraison rapide.',
   whatsapp: '', phone_display: '', email: '', address: '', hours: '', facebook: '', instagram: '', tiktok: '', announcement: '',
   currency: 'FCFA', delivery_fee: '0', free_delivery_min: '0', delivery_note: 'Frais de livraison confirmés par WhatsApp selon votre quartier.',
-  seo_title: '', google_verification: '', ga4_id: '', meta_pixel_id: '', pickup_enabled: '1', low_stock_threshold: '3', order_prefix: 'CMD', primary_color: '#D91B1B', logo_url: '', favicon_url: '', page_faq: '', page_terms: '', page_privacy: '', color_dark: '', color_bg: '', font: 'classic', radius: 'soft', theme: '', theme_from: '', theme_to: '',
+  seo_title: '', google_verification: '', ga4_id: '', meta_pixel_id: '', pickup_enabled: '1', low_stock_threshold: '3', order_prefix: 'CMD', primary_color: '#D91B1B', logo_url: '', favicon_url: '', page_faq: '', page_terms: '', page_privacy: '', color_dark: '', color_bg: '', font: 'classic', radius: 'soft', theme: '', theme_from: '', theme_to: '', template: 'classique',
 };
 export const PUBLIC_SETTINGS = ['shop_name', 'tagline', 'hero_title', 'hero_text', 'about_text', 'meta_description', 'whatsapp', 'phone_display', 'email', 'address', 'hours',
   'facebook', 'instagram', 'tiktok', 'announcement', 'currency', 'delivery_fee', 'free_delivery_min', 'delivery_note', 'pickup_enabled', 'primary_color', 'logo_url', 'seo_title'];

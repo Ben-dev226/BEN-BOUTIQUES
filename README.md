@@ -244,3 +244,8 @@ Menu **Apparence** de l'admin (administrateurs de la boutique) :
 - **Thème de saison** : Noël, Nouvel An, Saint-Valentin, Ramadan, Tabaski et Aïd, Black Friday, Soldes, Rentrée, Fête des mères. Chacun apporte sa palette et un décor léger (neige, coeurs, croissants, confettis, fleurs) sans image ni script. Avec des dates, le thème s'active et s'éteint seul ; hors dates, la boutique reprend ses couleurs.
 - **Suggestions** : selon la date du jour, l'écran propose la prochaine occasion avec ses dates, et un bandeau d'annonce à reprendre. Dates du Ramadan, de l'Aïd et de la Tabaski approximatives (table 2027 à 2029 dans `lib/themes.ts`).
 - Aperçu en direct à droite. Ajouter un thème : une ligne dans `PRESETS` (`lib/themes.ts`).
+
+## 21. Modèles de boutique et tâches planifiées
+
+- **Modèles** (admin, Apparence) : Classique, Vitrine, Catalogue, Éditorial, Lien en bio. Ils changent la mise en page (en-tête, accueil, cartes produit) et se combinent avec les couleurs, polices et thèmes de saison. Ajouter un modèle : une entrée dans `lib/templates.ts`, les règles CSS `[data-tpl=...]` à la fin de `public/assets/css/shop.css` et, si l'accueil change, une variante dans `app/route.tsx`.
+- **Tâches planifiées avec cron-job.org** : voir la réponse détaillée dans la conversation ; en bref, trois tâches sur `/api/cron/backup` (1 fois par jour), `/api/cron/watch` (1 fois par jour) avec l'en-tête `Authorization: Bearer <CRON_SECRET>`, et `/api/health` toutes les 5 minutes (sans en-tête). Si vous les utilisez, supprimez la section `crons` de `vercel.json` pour ne pas les lancer deux fois.

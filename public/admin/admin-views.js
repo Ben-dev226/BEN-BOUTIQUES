@@ -282,6 +282,14 @@ A.route(/^\/appearance$/, async view => {
   const own = () => ({ primary: st.primary_color || T.default_look.primary, dark: st.color_dark || T.default_look.dark, bg: st.color_bg || T.default_look.bg });
   const shown = () => T.presets.find(p => p.id === st.theme) || own();
   const dt = s => { const d = new Date(s + 'T00:00:00Z'); return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' }); };
+  const wire = id => { const r = (x, y, w, h, f = '#cfd8d2') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" fill="${f}"/>`, D = '#0D3B2C';
+    const P = {
+      classique: r(0, 0, 80, 7, D) + r(0, 8, 80, 18, D) + [0, 1, 2, 3].map(i => r(2 + i * 19.5, 30, 17, 22)).join(''),
+      vitrine: r(26, 2, 28, 4, D) + r(14, 9, 52, 2) + r(0, 14, 80, 12, '#e4e8df') + [0, 1, 2].map(i => r(3 + i * 26, 30, 22, 24)).join(''),
+      catalogue: r(0, 0, 80, 9, D) + [0, 1, 2, 3].map(i => r(2 + (i % 2) * 39, 13 + Math.floor(i / 2) * 22, 36, 19)).join('') + [0, 1, 2, 3].map(i => r(3 + (i % 2) * 39, 14 + Math.floor(i / 2) * 22, 10, 17, D)).join(''),
+      minimal: r(3, 3, 14, 3, D) + r(40, 4, 36, 1.5) + r(3, 14, 54, 8, D) + r(3, 24, 74, .8) + [0, 1, 2].map(i => r(3 + i * 25, 29, 22, 24)).join(''),
+      mobile: r(0, 0, 80, 5, D) + `<circle cx="40" cy="14" r="6" fill="${D}"/>` + r(22, 23, 36, 4, '#25D366') + r(26, 29, 28, 3) + r(18, 35, 44, 8) + r(18, 45, 44, 8),
+    }; return `<svg viewBox="0 0 80 56" width="100%" style="background:#f4f6f1;border-radius:6px;margin-bottom:.4rem" aria-hidden="true">${P[id] || ''}</svg>`; };
   view.innerHTML = `<style>
     .ap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:1rem;align-items:start;max-width:1120px}@media(max-width:900px){.ap{grid-template-columns:1fr}}
     .ap-sw{display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid #0002;vertical-align:middle}.ap-sw i{width:16px;height:16px;display:block}
@@ -298,6 +306,10 @@ A.route(/^\/appearance$/, async view => {
   <div class="page-head"><h1>Apparence</h1></div>
   <div id="sug"></div>
   <div class="ap"><form id="apf" class="stack">
+    <div class="card stack"><h2>Modèle de boutique</h2>
+      <p class="muted small">La mise en page de votre boutique : en-tête, accueil et présentation des produits. Vos couleurs, polices et thèmes de saison s’appliquent à tous les modèles.</p>
+      <div class="ap-grid" id="tp" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${T.templates.map(t => `<button type="button" class="ap-opt" data-tp="${t.id}" aria-pressed="false">${wire(t.id)}<b style="font-size:.88rem">${esc(t.label)}</b><small>${esc(t.tagline)}</small><small style="margin-top:.3rem"><b>Idéal pour :</b> ${esc(t.best)}</small></button>`).join('')}</div>
+    </div>
     <div class="card stack"><h2>Mes couleurs</h2>
       <p class="muted small">Palettes prêtes à l’emploi, puis ajustez chaque couleur si besoin. Elles s’appliquent toute l’année, sauf pendant un thème de saison.</p>
       <div class="ap-grid" id="pal">${T.palettes.map(p => `<button type="button" class="ap-opt" data-pal="${p.id}" aria-pressed="false"><span class="ap-sw"><i style="background:${p.primary}"></i><i style="background:${p.dark}"></i><i style="background:${p.bg}"></i></span> <b style="font-size:.85rem">${esc(p.label)}</b></button>`).join('')}</div>
@@ -324,6 +336,7 @@ A.route(/^\/appearance$/, async view => {
     $f('primary_color').value = st.primary_color || T.default_look.primary; $f('color_dark').value = st.color_dark || T.default_look.dark; $f('color_bg').value = st.color_bg || T.default_look.bg;
     $f('font').value = st.font || 'classic'; $f('radius').value = st.radius || 'soft'; $f('theme_from').value = st.theme_from || ''; $f('theme_to').value = st.theme_to || '';
     view.querySelectorAll('[data-th]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.th === (st.theme || ''))));
+    view.querySelectorAll('[data-tp]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tp === (st.template || 'classique'))));
     const w = own(); view.querySelectorAll('[data-pal]').forEach(b => { const p = T.palettes.find(x => x.id === b.dataset.pal); b.setAttribute('aria-pressed', String(p.primary.toLowerCase() === w.primary.toLowerCase() && p.dark.toLowerCase() === w.dark.toLowerCase() && p.bg.toLowerCase() === w.bg.toLowerCase())); });
     const L = shown(), pv = view.querySelector('#pv'), r = T.radii.find(x => x.id === (st.radius || 'soft')).r;
     pv.style.cssText = `--red:${L.primary};--ink:${L.dark};--paper:${L.bg};--cream:${mixc(L.bg, L.dark, .07)};--line:${mixc(L.bg, L.dark, .16)};--muted:${mixc(L.dark, L.bg, .4)};--r:${r};--on:${ratio('#ffffff', L.primary) >= 3 ? '#fff' : '#0E0E0E'}`;
@@ -332,16 +345,17 @@ A.route(/^\/appearance$/, async view => {
     wn.className = 'ap-warn ' + (bad ? 'bad' : 'ok'); wn.textContent = bad || `Lisibilité correcte (contraste ${c.toFixed(1)}:1).`;
   };
   view.querySelector('#pal').addEventListener('click', e => { const b = e.target.closest('[data-pal]'); if (!b) return; const p = T.palettes.find(x => x.id === b.dataset.pal); st.primary_color = p.primary; st.color_dark = p.dark; st.color_bg = p.bg; sync(); });
+  view.querySelector('#tp').addEventListener('click', e => { const b = e.target.closest('[data-tp]'); if (!b) return; st.template = b.dataset.tp; sync(); });
   view.querySelector('#th').addEventListener('click', e => { const b = e.target.closest('[data-th]'); if (!b) return; st.theme = b.dataset.th; if (!st.theme) { st.theme_from = ''; st.theme_to = ''; } sync(); });
   F.addEventListener('input', e => { const n = e.target.name; if (n) { st[n] = e.target.value; sync(); } });
   sync();
   const sug = view.querySelector('#sug');
-  sug.innerHTML = T.suggestions.map((x, i) => `<div class="card ap-sug" style="margin-bottom:.6rem;max-width:1120px"><div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b>${x.active ? esc(x.label) + ' : c’est maintenant' : esc(x.label) + ' dans ' + x.starts_in + ' jour' + (x.starts_in > 1 ? 's' : '')}</b><div class="muted small">Thème conseillé du ${dt(x.from)} au ${dt(x.to)}${x.approx ? ' (dates approximatives)' : ''}. Bandeau proposé : « ${esc(x.announcement)} »</div></div><button type="button" class="btn sm primary" data-sg="${i}">Appliquer</button></div></div>`).join('');
+  sug.innerHTML = T.suggestions.map((x, i) => `<div class="card ap-sug" style="margin-bottom:.6rem;max-width:1120px"><div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b>${x.active ? esc(x.label) + ' : c’est maintenant' : esc(x.label) + ' dans ' + x.starts_in + ' jour' + (x.starts_in > 1 ? 's' : '')}</b><div class="muted small">Thème conseillé du ${dt(x.from)} au ${dt(x.to)}${x.approx ? ' (dates approximatives)' : ''}, bandeau proposé : « ${esc(x.announcement)} »</div></div><button type="button" class="btn sm primary" data-sg="${i}">Appliquer</button></div></div>`).join('');
   sug.addEventListener('click', async e => { const b = e.target.closest('[data-sg]'); if (!b) return; const x = T.suggestions[+b.dataset.sg];
     const body = { theme: x.preset, theme_from: x.from, theme_to: x.to }; if (confirm('Remplacer aussi le bandeau d’annonce par la proposition ?\n\n' + x.announcement + '\n\n(Annuler = garder votre bandeau actuel)')) body.announcement = x.announcement;
     try { await api('admin/settings', { method: 'PUT', body }); toast('Thème appliqué'); location.reload(); } catch (err) { fail(err); } });
   F.addEventListener('submit', async e => { e.preventDefault(); const body = {};
-    for (const k of ['primary_color', 'color_dark', 'color_bg', 'font', 'radius', 'theme', 'theme_from', 'theme_to']) if ((st[k] || '') !== (o[k] || '')) body[k] = st[k] || '';
+    for (const k of ['template', 'primary_color', 'color_dark', 'color_bg', 'font', 'radius', 'theme', 'theme_from', 'theme_to']) if ((st[k] || '') !== (o[k] || '')) body[k] = st[k] || '';
     if (!Object.keys(body).length) return toast('Aucun changement à enregistrer');
     try { const r = await api('admin/settings', { method: 'PUT', body }); Object.assign(o, body); Object.assign(A.shop, r.settings); toast('Apparence enregistrée'); } catch (x) { fail(x); } });
 }, 'appearance');
